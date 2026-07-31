@@ -8,11 +8,11 @@ try {
   // no .env.local present — fine in production
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-
-const LOCAL_DB_PATH = `file:${path.join(DATA_DIR, "nexuscx.sqlite")}`;
-
+function getLocalDbPath(): string {
+  const DATA_DIR = path.join(process.cwd(), "data");
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  return `file:${path.join(DATA_DIR, "nexuscx.sqlite")}`;
+}
 
 export const db = createClient(
   process.env.TURSO_DATABASE_URL
@@ -20,7 +20,7 @@ export const db = createClient(
         url: process.env.TURSO_DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN,
       }
-    : { url: LOCAL_DB_PATH }
+    : { url: getLocalDbPath() }
 );
 
 export async function dbGet<T = unknown>(sql: string, args: unknown[] = []): Promise<T | undefined> {
