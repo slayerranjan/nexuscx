@@ -10,6 +10,9 @@ interface ChatMessage {
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [visitorName, setVisitorName] = useState("");
+  const [visitorContact, setVisitorContact] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     { sender: "ai", content: "Hi! I'm the Avtar Retail Co assistant. Ask me about your order, returns, shipping, or your account — I'll help right away, or connect you with someone who can." },
   ]);
@@ -20,7 +23,17 @@ export function ChatWidget() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, open]);
+  }, [messages, open, contactSubmitted]);
+
+  function handleContactSubmit() {
+    if (!visitorName.trim()) return;
+    setContactSubmitted(true);
+  }
+
+  function handleSkip() {
+    setVisitorName("Website visitor");
+    setContactSubmitted(true);
+  }
 
   async function sendMessage() {
     const text = input.trim();
@@ -30,10 +43,17 @@ export function ChatWidget() {
     setSending(true);
 
     try {
+      const isEmail = visitorContact.includes("@");
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, message: text, visitorName: "Website visitor" }),
+        body: JSON.stringify({
+          conversationId,
+          message: text,
+          visitorName: visitorName || "Website visitor",
+          visitorEmail: isEmail ? visitorContact : undefined,
+          visitorPhone: !isEmail && visitorContact ? visitorContact : undefined,
+        }),
       });
       const data = await res.json();
       setConversationId(data.conversationId);
@@ -59,51 +79,84 @@ export function ChatWidget() {
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-canvas">
-            {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.sender === "visitor" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                    m.sender === "visitor"
-                      ? "bg-navy text-white rounded-br-sm"
-                      : "bg-surface text-ink border border-line rounded-bl-sm"
-                  }`}
-                >
-                  {m.content}
-                  {m.escalated && (
-                    <div className="mt-1.5 pt-1.5 border-t border-line/50 text-[11px] text-steel flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
-                      Connecting you with a team member
+          {!contactSubmitted ? (
+            <div className="flex-1 flex flex-col justify-center px-5 py-4 bg-canvas">
+              <p className="text-sm text-ink font-medium mb-1">Before we start…</p>
+              <p className="text-xs text-ink-muted mb-4">
+                So we can keep track of your conversation and reach you if needed.
+              </p>
+              <input
+                value={visitorName}
+                onChange={(e) => setVisitorName(e.target.value)}
+                placeholder="Your name"
+                className="w-full rounded-md border border-line px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy"
+              />
+              <input
+                value={visitorContact}
+                onChange={(e) => setVisitorContact(e.target.value)}
+                placeholder="Email or WhatsApp number (optional)"
+                className="w-full rounded-md border border-line px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy"
+              />
+              <button
+                onClick={handleContactSubmit}
+                disabled={!visitorName.trim()}
+                className="w-full bg-navy hover:bg-navy-soft text-white text-sm font-medium py-2 rounded-md transition-colors disabled:opacity-50 mb-2"
+              >
+                Start chat
+              </button>
+              <button onClick={handleSkip} className="text-xs text-ink-muted hover:text-ink underline mx-auto">
+                Skip for now
+              </button>
+            </div>
+          ) : (
+            <>
+              <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-canvas">
+                {messages.map((m, i) => (
+                  <div key={i} className={`flex ${m.sender === "visitor" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                        m.sender === "visitor"
+                          ? "bg-navy text-white rounded-br-sm"
+                          : "bg-surface text-ink border border-line rounded-bl-sm"
+                      }`}
+                    >
+                      {m.content}
+                      {m.escalated && (
+                        <div className="mt-1.5 pt-1.5 border-t border-line/50 text-[11px] text-steel flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+                          Connecting you with a team member
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                ))}
+                {sending && (
+                  <div className="flex justify-start">
+                    <div className="bg-surface border border-line rounded-lg rounded-bl-sm px-3 py-2 text-sm text-ink-muted">
+                      Typing…
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
-            {sending && (
-              <div className="flex justify-start">
-                <div className="bg-surface border border-line rounded-lg rounded-bl-sm px-3 py-2 text-sm text-ink-muted">
-                  Typing…
-                </div>
-              </div>
-            )}
-          </div>
 
-          <div className="border-t border-line p-2.5 flex gap-2">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type your message…"
-              className="flex-1 rounded-md border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={sending || !input.trim()}
-              className="bg-navy hover:bg-navy-soft text-white text-sm font-medium px-3.5 rounded-md transition-colors disabled:opacity-50"
-            >
-              Send
-            </button>
-          </div>
+              <div className="border-t border-line p-2.5 flex gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+                  placeholder="Type your message…"
+                  className="flex-1 rounded-md border border-line px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy/30 focus:border-navy"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={sending || !input.trim()}
+                  className="bg-navy hover:bg-navy-soft text-white text-sm font-medium px-3.5 rounded-md transition-colors disabled:opacity-50"
+                >
+                  Send
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

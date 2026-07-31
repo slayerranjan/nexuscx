@@ -8,7 +8,7 @@ export async function suggestAgentReply(
   const lastVisitorMessage = [...messages].reverse().find((m) => m.sender === "visitor");
   if (!lastVisitorMessage) return null;
 
-  const relevant = retrieveRelevantChunks(organizationId, lastVisitorMessage.content, 3);
+  const relevant = await retrieveRelevantChunks(organizationId, lastVisitorMessage.content, 3);
   const context = relevant.map((c) => c.chunk_text);
 
   const history = messages

@@ -1,5 +1,5 @@
+import { Suspense } from "react";
 import { LoginForm } from "./login-form";
-
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-navy-deep px-4">
@@ -12,7 +12,9 @@ export default function LoginPage() {
           <p className="text-steel-soft text-sm">AI Customer Experience — Avtar India</p>
         </div>
         <div className="bg-surface rounded-lg shadow-xl p-8 border border-line">
-          <LoginForm />
+          <Suspense fallback={<div className="text-sm text-ink-muted text-center py-8">Loading…</div>}>
+           <LoginForm />
+          </Suspense>
         </div>
         <div className="mt-6 text-center text-xs text-steel-soft space-y-1">
           <p>Demo logins (password: demo1234)</p>

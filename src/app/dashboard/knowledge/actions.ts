@@ -13,6 +13,6 @@ export async function addArticle(formData: FormData) {
   const category = String(formData.get("category") ?? "General").trim() || "General";
   if (!title || !content) return;
 
-  createArticle({ organizationId: agent.organization_id, title, content, category });
+  await createArticle({ organizationId: agent.organization_id, title, content, category });
   revalidatePath("/dashboard/knowledge");
 }

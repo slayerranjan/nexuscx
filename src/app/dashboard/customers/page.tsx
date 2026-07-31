@@ -5,7 +5,7 @@ import { formatDistanceToNow } from "date-fns";
 
 export default async function CustomersPage() {
   const agent = await getCurrentAgent();
-  const customers = listCustomers(agent!.organization_id);
+  const customers = await listCustomers(agent!.organization_id);
 
   return (
     <div className="p-8 max-w-4xl">

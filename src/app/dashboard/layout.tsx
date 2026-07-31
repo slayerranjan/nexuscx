@@ -2,10 +2,14 @@ import Link from "next/link";
 import { getCurrentAgent } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { SignOutButton } from "./sign-out-button";
+import { getUnassignedEscalatedCount } from "@/lib/db/queries";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const agent = await getCurrentAgent();
   if (!agent) redirect("/login");
+
+  const unassignedCount = await getUnassignedEscalatedCount(agent.organization_id);
+  const isAdmin = agent.role === "admin";
 
   return (
     <div className="min-h-screen flex">
@@ -18,7 +22,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </div>
         <nav className="flex-1 px-2.5 space-y-0.5">
           <NavLink href="/dashboard">Overview</NavLink>
-          <NavLink href="/dashboard/conversations">Live queue</NavLink>
+          <NavLink href="/dashboard/conversations" badge={unassignedCount}>
+            Live queue
+          </NavLink>
+          {isAdmin && <NavLink href="/dashboard/team">Team performance</NavLink>}
           <NavLink href="/dashboard/customers">Customers</NavLink>
           <NavLink href="/dashboard/knowledge">Knowledge base</NavLink>
           <NavLink href="/dashboard/knowledge-gaps">Knowledge gaps</NavLink>
@@ -37,14 +44,29 @@ export default async function DashboardLayout({ children }: { children: React.Re
   );
 }
 
-function NavLink({ href, children, external }: { href: string; children: React.ReactNode; external?: boolean }) {
+function NavLink({
+  href,
+  children,
+  external,
+  badge,
+}: {
+  href: string;
+  children: React.ReactNode;
+  external?: boolean;
+  badge?: number;
+}) {
   return (
     <Link
       href={href}
       target={external ? "_blank" : undefined}
-      className="block px-3 py-2 rounded-md text-sm text-steel-soft hover:bg-navy hover:text-white transition-colors"
+      className="flex items-center justify-between px-3 py-2 rounded-md text-sm text-steel-soft hover:bg-navy hover:text-white transition-colors"
     >
-      {children}
+      <span>{children}</span>
+      {!!badge && badge > 0 && (
+        <span className="bg-danger text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }

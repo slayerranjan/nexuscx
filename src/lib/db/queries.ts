@@ -1,5 +1,5 @@
 import "./schema";
-import { db } from "./client";
+import { dbGet, dbAll, dbRun } from "./client";
 import { randomUUID } from "node:crypto";
 
 export const id = () => randomUUID();
@@ -42,6 +42,7 @@ export interface Conversation {
   visitor_email: string | null;
   status: "open" | "closed";
   resolution: Resolution;
+  priority: "low" | "medium" | "high";
   assigned_agent_id: string | null;
   topic_tag: string | null;
   sentiment: "positive" | "neutral" | "negative" | null;
@@ -60,150 +61,156 @@ export interface Message {
 }
 
 // ---------- agents ----------
-export function getAgentByEmail(email: string): AgentRecord | undefined {
-  return db.prepare(`SELECT * FROM agents WHERE email = ?`).get(email) as unknown as AgentRecord | undefined;
+export async function getAgentByEmail(email: string): Promise<AgentRecord | undefined> {
+  return dbGet<AgentRecord>(`SELECT * FROM agents WHERE email = ?`, [email]);
 }
-export function getAgentById(agentId: string): AgentRecord | undefined {
-  return db.prepare(`SELECT * FROM agents WHERE id = ?`).get(agentId) as unknown as AgentRecord | undefined;
+export async function getAgentById(agentId: string): Promise<AgentRecord | undefined> {
+  return dbGet<AgentRecord>(`SELECT * FROM agents WHERE id = ?`, [agentId]);
 }
-export function listAgents(organizationId: string): AgentRecord[] {
-  return db.prepare(`SELECT * FROM agents WHERE organization_id = ? ORDER BY name`).all(organizationId) as unknown as AgentRecord[];
+export async function listAgents(organizationId: string): Promise<AgentRecord[]> {
+  return dbAll<AgentRecord>(`SELECT * FROM agents WHERE organization_id = ? ORDER BY name`, [organizationId]);
 }
 
 // ---------- knowledge base ----------
-export function listArticles(organizationId: string): KnowledgeArticle[] {
-  return db
-    .prepare(`SELECT * FROM knowledge_articles WHERE organization_id = ? ORDER BY category, title`)
-    .all(organizationId) as unknown as KnowledgeArticle[];
+export async function listArticles(organizationId: string): Promise<KnowledgeArticle[]> {
+  return dbAll<KnowledgeArticle>(
+    `SELECT * FROM knowledge_articles WHERE organization_id = ? ORDER BY category, title`,
+    [organizationId]
+  );
 }
-export function getArticle(articleId: string): KnowledgeArticle | undefined {
-  return db.prepare(`SELECT * FROM knowledge_articles WHERE id = ?`).get(articleId) as unknown as KnowledgeArticle | undefined;
+export async function getArticle(articleId: string): Promise<KnowledgeArticle | undefined> {
+  return dbGet<KnowledgeArticle>(`SELECT * FROM knowledge_articles WHERE id = ?`, [articleId]);
 }
-export function listAllChunks(organizationId: string): (ArticleChunk & { article_title: string })[] {
-  return db
-    .prepare(
-      `SELECT c.*, a.title as article_title FROM article_chunks c
-       JOIN knowledge_articles a ON a.id = c.article_id
-       WHERE a.organization_id = ?`
-    )
-    .all(organizationId) as unknown as (ArticleChunk & { article_title: string })[];
+export async function listAllChunks(organizationId: string): Promise<(ArticleChunk & { article_title: string })[]> {
+  return dbAll<ArticleChunk & { article_title: string }>(
+    `SELECT c.*, a.title as article_title FROM article_chunks c
+     JOIN knowledge_articles a ON a.id = c.article_id
+     WHERE a.organization_id = ?`,
+    [organizationId]
+  );
 }
 
-export function createArticle(input: {
+export async function createArticle(input: {
   organizationId: string;
   title: string;
   content: string;
   category: string;
-}): KnowledgeArticle {
+}): Promise<KnowledgeArticle> {
   const articleId = id();
-  db.prepare(
-    `INSERT INTO knowledge_articles (id, organization_id, title, content, category) VALUES (?, ?, ?, ?, ?)`
-  ).run(articleId, input.organizationId, input.title, input.content, input.category);
-  indexArticle(articleId, input.content);
-  return getArticle(articleId)!;
+  await dbRun(
+    `INSERT INTO knowledge_articles (id, organization_id, title, content, category) VALUES (?, ?, ?, ?, ?)`,
+    [articleId, input.organizationId, input.title, input.content, input.category]
+  );
+  await indexArticle(articleId, input.content);
+  return (await getArticle(articleId))!;
 }
 
-export function indexArticle(articleId: string, content: string): void {
-  db.prepare(`DELETE FROM article_chunks WHERE article_id = ?`).run(articleId);
+export async function indexArticle(articleId: string, content: string): Promise<void> {
+  await dbRun(`DELETE FROM article_chunks WHERE article_id = ?`, [articleId]);
   const paragraphs = content
     .split(/\n{2,}/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0);
-  const insert = db.prepare(
-    `INSERT INTO article_chunks (id, article_id, chunk_index, chunk_text) VALUES (?, ?, ?, ?)`
-  );
-  paragraphs.forEach((p, idx) => insert.run(id(), articleId, idx, p));
+  for (let idx = 0; idx < paragraphs.length; idx++) {
+    await dbRun(
+      `INSERT INTO article_chunks (id, article_id, chunk_index, chunk_text) VALUES (?, ?, ?, ?)`,
+      [id(), articleId, idx, paragraphs[idx]]
+    );
+  }
 }
 
 // ---------- conversations ----------
-export function createConversation(input: {
+export async function createConversation(input: {
   organizationId: string;
   channel?: Channel;
   visitorName?: string;
   visitorEmail?: string;
   customerId?: string;
-}): Conversation {
+}): Promise<Conversation> {
   const convId = id();
-  db.prepare(
+  await dbRun(
     `INSERT INTO conversations (id, organization_id, channel, visitor_name, visitor_email, customer_id)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    convId,
-    input.organizationId,
-    input.channel ?? "website",
-    input.visitorName ?? null,
-    input.visitorEmail ?? null,
-    input.customerId ?? null
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      convId,
+      input.organizationId,
+      input.channel ?? "website",
+      input.visitorName ?? null,
+      input.visitorEmail ?? null,
+      input.customerId ?? null,
+    ]
   );
-  return getConversation(convId)!;
+  return (await getConversation(convId))!;
 }
 
-
-export function getConversation(conversationId: string): Conversation | undefined {
-  return db.prepare(`SELECT * FROM conversations WHERE id = ?`).get(conversationId) as unknown as Conversation | undefined;
+export async function getConversation(conversationId: string): Promise<Conversation | undefined> {
+  return dbGet<Conversation>(`SELECT * FROM conversations WHERE id = ?`, [conversationId]);
 }
 
-export function listConversations(organizationId: string): Conversation[] {
-  return db
-    .prepare(`SELECT * FROM conversations WHERE organization_id = ? ORDER BY updated_at DESC`)
-    .all(organizationId) as unknown as Conversation[];
+export async function listConversations(organizationId: string): Promise<Conversation[]> {
+  return dbAll<Conversation>(
+    `SELECT * FROM conversations WHERE organization_id = ? ORDER BY updated_at DESC`,
+    [organizationId]
+  );
 }
 
-export function updateConversationResolution(
+export async function updateConversationResolution(
   conversationId: string,
   resolution: Resolution,
-  extra?: { topicTag?: string; sentiment?: "positive" | "neutral" | "negative" }
-): void {
-  db.prepare(
-    `UPDATE conversations SET resolution = ?, topic_tag = COALESCE(?, topic_tag), sentiment = COALESCE(?, sentiment), updated_at = datetime('now') WHERE id = ?`
-  ).run(resolution, extra?.topicTag ?? null, extra?.sentiment ?? null, conversationId);
-}
-
-export function assignAgent(conversationId: string, agentId: string): void {
-  db.prepare(`UPDATE conversations SET assigned_agent_id = ?, updated_at = datetime('now') WHERE id = ?`).run(
-    agentId,
-    conversationId
+  extra?: { topicTag?: string; sentiment?: "positive" | "neutral" | "negative"; priority?: "low" | "medium" | "high" }
+): Promise<void> {
+  await dbRun(
+    `UPDATE conversations SET resolution = ?, topic_tag = COALESCE(?, topic_tag), sentiment = COALESCE(?, sentiment), priority = COALESCE(?, priority), updated_at = datetime('now') WHERE id = ?`,
+    [resolution, extra?.topicTag ?? null, extra?.sentiment ?? null, extra?.priority ?? null, conversationId]
   );
 }
 
-export function closeConversation(conversationId: string): void {
-  db.prepare(`UPDATE conversations SET status = 'closed', updated_at = datetime('now') WHERE id = ?`).run(
-    conversationId
+export async function setPriority(conversationId: string, priority: "low" | "medium" | "high"): Promise<void> {
+  await dbRun(`UPDATE conversations SET priority = ?, updated_at = datetime('now') WHERE id = ?`, [priority, conversationId]);
+}
+
+export async function assignAgent(conversationId: string, agentId: string): Promise<void> {
+  await dbRun(
+    `UPDATE conversations SET assigned_agent_id = ?, updated_at = datetime('now') WHERE id = ?`,
+    [agentId, conversationId]
   );
+}
+
+export async function closeConversation(conversationId: string): Promise<void> {
+  await dbRun(`UPDATE conversations SET status = 'closed', updated_at = datetime('now') WHERE id = ?`, [conversationId]);
 }
 
 // ---------- messages ----------
-export function listMessages(conversationId: string): Message[] {
-  return db
-    .prepare(`SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`)
-    .all(conversationId) as unknown as Message[];
+export async function listMessages(conversationId: string): Promise<Message[]> {
+  return dbAll<Message>(`SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`, [conversationId]);
 }
 
-export function addMessage(input: {
+export async function addMessage(input: {
   conversationId: string;
   sender: Sender;
   content: string;
   agentName?: string;
   escalationFlag?: boolean;
-}): Message {
+}): Promise<Message> {
   const msgId = id();
-  db.prepare(
-    `INSERT INTO messages (id, conversation_id, sender, content, agent_name, escalation_flag) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(msgId, input.conversationId, input.sender, input.content, input.agentName ?? null, input.escalationFlag ? 1 : 0);
-  db.prepare(`UPDATE conversations SET updated_at = datetime('now') WHERE id = ?`).run(input.conversationId);
-  return db.prepare(`SELECT * FROM messages WHERE id = ?`).get(msgId) as unknown as Message;
+  await dbRun(
+    `INSERT INTO messages (id, conversation_id, sender, content, agent_name, escalation_flag) VALUES (?, ?, ?, ?, ?, ?)`,
+    [msgId, input.conversationId, input.sender, input.content, input.agentName ?? null, input.escalationFlag ? 1 : 0]
+  );
+  await dbRun(`UPDATE conversations SET updated_at = datetime('now') WHERE id = ?`, [input.conversationId]);
+  return (await dbGet<Message>(`SELECT * FROM messages WHERE id = ?`, [msgId]))!;
 }
 
 // ---------- org-wide stats ----------
-export function getOrgStats(organizationId: string) {
-  const conversations = listConversations(organizationId);
+export async function getOrgStats(organizationId: string) {
+  const conversations = await listConversations(organizationId);
   const total = conversations.length;
   const aiResolved = conversations.filter((c) => c.resolution === "ai_resolved").length;
   const escalated = conversations.filter((c) => c.resolution === "escalated").length;
   const agentResolved = conversations.filter((c) => c.resolution === "agent_resolved").length;
   const pending = conversations.filter((c) => c.resolution === "pending" && c.status === "open").length;
 
-  const resolutionRate = total === 0 ? 0 : Math.round(((aiResolved) / total) * 100);
+  const resolutionRate = total === 0 ? 0 : Math.round((aiResolved / total) * 100);
 
   const topicCounts: Record<string, number> = {};
   for (const c of conversations) {
@@ -216,22 +223,27 @@ export function getOrgStats(organizationId: string) {
   return { total, aiResolved, escalated, agentResolved, pending, resolutionRate, topTopics };
 }
 
-export function getOrganization(organizationId: string): { id: string; name: string } | undefined {
-  return db.prepare(`SELECT id, name FROM organizations WHERE id = ?`).get(organizationId) as unknown as
-    | { id: string; name: string }
-    | undefined;
+
+export async function getCompanyHealthSnapshot(organizationId: string) {
+  const stats = await getOrgStats(organizationId);
+  return { total: stats.total, resolutionRate: stats.resolutionRate, pending: stats.pending };
 }
 
-export function listAgentsWithLoad(organizationId: string): (AgentRecord & { openCases: number })[] {
-  const agents = listAgents(organizationId);
-  return agents.map((a) => {
-    const row = db
-      .prepare(
-        `SELECT COUNT(*) as c FROM conversations WHERE assigned_agent_id = ? AND status = 'open'`
-      )
-      .get(a.id) as unknown as { c: number };
-    return { ...a, openCases: row.c };
-  });
+export async function getOrganization(organizationId: string): Promise<{ id: string; name: string } | undefined> {
+  return dbGet<{ id: string; name: string }>(`SELECT id, name FROM organizations WHERE id = ?`, [organizationId]);
+}
+
+export async function listAgentsWithLoad(organizationId: string): Promise<(AgentRecord & { openCases: number })[]> {
+  const agents = await listAgents(organizationId);
+  const result = [];
+  for (const a of agents) {
+    const row = await dbGet<{ c: number }>(
+      `SELECT COUNT(*) as c FROM conversations WHERE assigned_agent_id = ? AND status = 'open'`,
+      [a.id]
+    );
+    result.push({ ...a, openCases: row?.c ?? 0 });
+  }
+  return result;
 }
 
 // ---------- knowledge gap detection ----------
@@ -242,23 +254,21 @@ export interface KnowledgeGap {
   conversationIds: string[];
 }
 
-export function detectKnowledgeGaps(organizationId: string, minOccurrences = 2): KnowledgeGap[] {
-  const conversations = db
-    .prepare(
-      `SELECT id, topic_tag FROM conversations
-       WHERE organization_id = ? AND resolution = 'escalated' AND topic_tag IS NOT NULL
-       ORDER BY created_at ASC`
-    )
-    .all(organizationId) as unknown as { id: string; topic_tag: string }[];
+export async function detectKnowledgeGaps(organizationId: string, minOccurrences = 2): Promise<KnowledgeGap[]> {
+  const conversations = await dbAll<{ id: string; topic_tag: string }>(
+    `SELECT id, topic_tag FROM conversations
+     WHERE organization_id = ? AND resolution = 'escalated' AND topic_tag IS NOT NULL
+     ORDER BY created_at ASC`,
+    [organizationId]
+  );
 
   const grouped = new Map<string, { conversationIds: string[]; sampleQuestion: string }>();
 
   for (const conv of conversations) {
-    const firstVisitorMessage = db
-      .prepare(
-        `SELECT content FROM messages WHERE conversation_id = ? AND sender = 'visitor' ORDER BY created_at ASC LIMIT 1`
-      )
-      .get(conv.id) as unknown as { content: string } | undefined;
+    const firstVisitorMessage = await dbGet<{ content: string }>(
+      `SELECT content FROM messages WHERE conversation_id = ? AND sender = 'visitor' ORDER BY created_at ASC LIMIT 1`,
+      [conv.id]
+    );
 
     const key = conv.topic_tag;
     if (!grouped.has(key)) {
@@ -288,52 +298,156 @@ export interface Customer {
   first_seen_at: string;
 }
 
-export function findOrCreateCustomer(input: {
+export async function findOrCreateCustomer(input: {
   organizationId: string;
   name?: string;
   email?: string;
   phone?: string;
-}): Customer {
+}): Promise<Customer> {
   if (input.email) {
-    const existing = db
-      .prepare(`SELECT * FROM customers WHERE organization_id = ? AND email = ?`)
-      .get(input.organizationId, input.email) as unknown as Customer | undefined;
+    const existing = await dbGet<Customer>(
+      `SELECT * FROM customers WHERE organization_id = ? AND email = ?`,
+      [input.organizationId, input.email]
+    );
     if (existing) return existing;
   }
   if (input.phone) {
-    const existing = db
-      .prepare(`SELECT * FROM customers WHERE organization_id = ? AND phone = ?`)
-      .get(input.organizationId, input.phone) as unknown as Customer | undefined;
+    const existing = await dbGet<Customer>(
+      `SELECT * FROM customers WHERE organization_id = ? AND phone = ?`,
+      [input.organizationId, input.phone]
+    );
     if (existing) return existing;
   }
 
   const customerId = id();
-  db.prepare(
-    `INSERT INTO customers (id, organization_id, name, email, phone) VALUES (?, ?, ?, ?, ?)`
-  ).run(customerId, input.organizationId, input.name ?? null, input.email ?? null, input.phone ?? null);
+  await dbRun(
+    `INSERT INTO customers (id, organization_id, name, email, phone) VALUES (?, ?, ?, ?, ?)`,
+    [customerId, input.organizationId, input.name ?? null, input.email ?? null, input.phone ?? null]
+  );
 
-  return db.prepare(`SELECT * FROM customers WHERE id = ?`).get(customerId) as unknown as Customer;
+  return (await dbGet<Customer>(`SELECT * FROM customers WHERE id = ?`, [customerId]))!;
 }
 
-export function listCustomers(organizationId: string): (Customer & { conversationCount: number })[] {
-  return db
-    .prepare(
-      `SELECT c.*, COUNT(conv.id) as conversationCount
-       FROM customers c
-       LEFT JOIN conversations conv ON conv.customer_id = c.id
-       WHERE c.organization_id = ?
-       GROUP BY c.id
-       ORDER BY c.first_seen_at DESC`
-    )
-    .all(organizationId) as unknown as (Customer & { conversationCount: number })[];
+export async function listCustomers(organizationId: string): Promise<(Customer & { conversationCount: number })[]> {
+  return dbAll<Customer & { conversationCount: number }>(
+    `SELECT c.*, COUNT(conv.id) as conversationCount
+     FROM customers c
+     LEFT JOIN conversations conv ON conv.customer_id = c.id
+     WHERE c.organization_id = ?
+     GROUP BY c.id
+     ORDER BY c.first_seen_at DESC`,
+    [organizationId]
+  );
 }
 
-export function getCustomer(customerId: string): Customer | undefined {
-  return db.prepare(`SELECT * FROM customers WHERE id = ?`).get(customerId) as unknown as Customer | undefined;
+export async function getCustomer(customerId: string): Promise<Customer | undefined> {
+  return dbGet<Customer>(`SELECT * FROM customers WHERE id = ?`, [customerId]);
 }
 
-export function getCustomerConversations(customerId: string): Conversation[] {
-  return db
-    .prepare(`SELECT * FROM conversations WHERE customer_id = ? ORDER BY created_at DESC`)
-    .all(customerId) as unknown as Conversation[];
+export async function getCustomerConversations(customerId: string): Promise<Conversation[]> {
+  return dbAll<Conversation>(`SELECT * FROM conversations WHERE customer_id = ? ORDER BY created_at DESC`, [customerId]);
+}
+
+export async function getUnassignedEscalatedCount(organizationId: string): Promise<number> {
+  const row = await dbGet<{ c: number }>(
+    `SELECT COUNT(*) as c FROM conversations
+     WHERE organization_id = ? AND status = 'open'
+     AND (resolution = 'escalated' OR resolution = 'pending')
+     AND assigned_agent_id IS NULL`,
+    [organizationId]
+  );
+  return row?.c ?? 0;
+}
+
+export interface SlaStats {
+  avgFirstResponseMinutes: number | null;
+  avgResolutionMinutesByPriority: Record<string, number | null>;
+}
+
+export async function getSlaStats(organizationId: string): Promise<SlaStats> {
+  const conversations = await dbAll<{
+    id: string;
+    priority: string;
+    created_at: string;
+    updated_at: string;
+    status: string;
+    resolution: string;
+  }>(
+    `SELECT id, priority, created_at, updated_at, status, resolution FROM conversations WHERE organization_id = ?`,
+    [organizationId]
+  );
+
+  const firstResponseTimes: number[] = [];
+  for (const conv of conversations) {
+    const firstReply = await dbGet<{ created_at: string }>(
+      `SELECT created_at FROM messages WHERE conversation_id = ? AND sender IN ('ai','agent') ORDER BY created_at ASC LIMIT 1`,
+      [conv.id]
+    );
+    if (firstReply) {
+      const diffMinutes = (new Date(firstReply.created_at + "Z").getTime() - new Date(conv.created_at + "Z").getTime()) / 60000;
+      if (diffMinutes >= 0) firstResponseTimes.push(diffMinutes);
+    }
+  }
+
+  const avgFirstResponseMinutes =
+    firstResponseTimes.length === 0
+      ? null
+      : Math.round(firstResponseTimes.reduce((a, b) => a + b, 0) / firstResponseTimes.length);
+
+  const byPriority: Record<string, number[]> = { high: [], medium: [], low: [] };
+  for (const conv of conversations) {
+    if (conv.status !== "closed" && conv.resolution !== "ai_resolved") continue;
+    const diffMinutes = (new Date(conv.updated_at + "Z").getTime() - new Date(conv.created_at + "Z").getTime()) / 60000;
+    if (diffMinutes >= 0 && byPriority[conv.priority]) {
+      byPriority[conv.priority].push(diffMinutes);
+    }
+  }
+
+  const avgResolutionMinutesByPriority: Record<string, number | null> = {};
+  for (const [priority, times] of Object.entries(byPriority)) {
+    avgResolutionMinutesByPriority[priority] =
+      times.length === 0 ? null : Math.round(times.reduce((a, b) => a + b, 0) / times.length);
+  }
+
+  return { avgFirstResponseMinutes, avgResolutionMinutesByPriority };
+}
+
+export async function getAgentPersonalStats(organizationId: string, agentId: string) {
+  const conversations = await dbAll<{
+    id: string;
+    resolution: string;
+    priority: string;
+    created_at: string;
+    updated_at: string;
+    status: string;
+  }>(
+    `SELECT id, resolution, priority, created_at, updated_at, status FROM conversations
+     WHERE organization_id = ? AND assigned_agent_id = ?`,
+    [organizationId, agentId]
+  );
+
+  const total = conversations.length;
+  const resolved = conversations.filter((c) => c.resolution === "agent_resolved").length;
+  const open = conversations.filter((c) => c.status === "open").length;
+
+  const resolutionTimes: number[] = [];
+  for (const conv of conversations) {
+    if (conv.status !== "closed") continue;
+    const diffMinutes = (new Date(conv.updated_at + "Z").getTime() - new Date(conv.created_at + "Z").getTime()) / 60000;
+    if (diffMinutes >= 0) resolutionTimes.push(diffMinutes);
+  }
+  const avgResolutionMinutes =
+    resolutionTimes.length === 0 ? null : Math.round(resolutionTimes.reduce((a, b) => a + b, 0) / resolutionTimes.length);
+
+  return { total, resolved, open, avgResolutionMinutes };
+}
+
+export async function getTeamPerformance(organizationId: string) {
+  const agents = await listAgents(organizationId);
+  const results = [];
+  for (const a of agents) {
+    const stats = await getAgentPersonalStats(organizationId, a.id);
+    results.push({ id: a.id, name: a.name, role: a.role, ...stats });
+  }
+  return results.sort((a, b) => b.resolved - a.resolved);
 }

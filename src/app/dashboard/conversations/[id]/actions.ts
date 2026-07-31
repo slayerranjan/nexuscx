@@ -12,15 +12,15 @@ function canAct(conversation: { assigned_agent_id: string | null }, agent: { id:
 
 export async function sendAgentReply(conversationId: string, content: string) {
   const agent = await getCurrentAgent();
-  const conversation = getConversation(conversationId);
+  const conversation = await getConversation(conversationId);
   if (!agent || !conversation || !content.trim()) return;
   if (!canAct(conversation, agent)) return;
 
   if (!conversation.assigned_agent_id) {
-    assignAgent(conversationId, agent.id);
+    await assignAgent(conversationId, agent.id);
   }
 
-  addMessage({ conversationId, sender: "agent", content: content.trim(), agentName: agent.name });
+  await addMessage({ conversationId, sender: "agent", content: content.trim(), agentName: agent.name });
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
 }
@@ -28,25 +28,33 @@ export async function sendAgentReply(conversationId: string, content: string) {
 export async function claimCase(conversationId: string) {
   const agent = await getCurrentAgent();
   if (!agent) return;
-  assignAgent(conversationId, agent.id);
+  await assignAgent(conversationId, agent.id);
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
 }
 
 export async function markClosed(conversationId: string) {
   const agent = await getCurrentAgent();
-  const conversation = getConversation(conversationId);
+  const conversation = await getConversation(conversationId);
   if (!agent || !conversation || !canAct(conversation, agent)) return;
-  closeConversation(conversationId);
+  await closeConversation(conversationId);
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
 }
 
 export async function getSuggestion(conversationId: string) {
   const agent = await getCurrentAgent();
-  const conversation = getConversation(conversationId);
+  const conversation = await getConversation(conversationId);
   if (!agent || !conversation) return null;
 
-  const messages = listMessages(conversationId);
+  const messages = await listMessages(conversationId);
   return suggestAgentReply(agent.organization_id, messages);
+}
+
+export async function reassignCase(conversationId: string, newAgentId: string) {
+  const agent = await getCurrentAgent();
+  if (!agent || agent.role !== "admin") return;
+  await assignAgent(conversationId, newAgentId);
+  revalidatePath(`/dashboard/conversations/${conversationId}`);
+  revalidatePath("/dashboard/conversations");
 }

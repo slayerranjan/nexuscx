@@ -1,17 +1,5 @@
 import { listAllChunks, type ArticleChunk } from "@/lib/db/queries";
 
-/**
- * Retrieval layer for the knowledge base.
- *
- * Production note: this uses a local BM25-style lexical scorer instead of
- * vector embeddings, because this sandbox can only reach api.anthropic.com —
- * embedding providers (Voyage, OpenAI) aren't on the allowed network list.
- * The retrieval function below is the single seam to swap: replace
- * `retrieveRelevantChunks` with a real vector-similarity lookup once this
- * is deployed somewhere with embeddings API access. Nothing else in the
- * app needs to change — callers just get chunks back either way.
- */
-
 type ScoredChunk = ArticleChunk & { article_title: string; score: number };
 
 const STOPWORDS = new Set([
@@ -20,12 +8,6 @@ const STOPWORDS = new Set([
   "will","how's","how do","please","hi","hello","thanks","thank",
 ]);
 
-// Raw-token synonym normalization, applied before stemming. Covers the
-// support-domain synonym clusters that a lexical scorer would otherwise
-// miss entirely (e.g. "broken" vs "damaged", "arrive" vs "delivered").
-// A production deployment with embeddings-API access would replace this
-// whole file's approach with real vector similarity, which handles
-// synonyms natively — this is the pragmatic stand-in for that.
 const RAW_SYNONYMS: Record<string, string> = {
   arrive: "deliver", arrives: "deliver", arrived: "deliver", arriving: "deliver",
   delivery: "deliver", delivered: "deliver", deliveries: "deliver",
@@ -59,15 +41,12 @@ function tokenize(text: string): string[] {
     .map(stem);
 }
 
-/**
- * BM25 scoring across all chunks for an organization.
- */
-export function retrieveRelevantChunks(
+export async function retrieveRelevantChunks(
   organizationId: string,
   query: string,
   topK = 4
-): ScoredChunk[] {
-  const chunks = listAllChunks(organizationId);
+): Promise<ScoredChunk[]> {
+  const chunks = await listAllChunks(organizationId);
   if (chunks.length === 0) return [];
 
   const queryTerms = tokenize(query);
@@ -75,9 +54,8 @@ export function retrieveRelevantChunks(
 
   const docs = chunks.map((c) => tokenize(c.chunk_text));
   const N = docs.length;
-  const avgLen = docs.reduce((s, d) => s + d.length, 0) / N;
+  const avgLen = docs.reduce((s: number, d: string[]) => s + d.length, 0) / N;
 
-  // document frequency per term
   const df: Record<string, number> = {};
   for (const doc of docs) {
     const seen = new Set(doc);
@@ -92,7 +70,7 @@ export function retrieveRelevantChunks(
     const docLen = doc.length || 1;
     let score = 0;
     for (const term of queryTerms) {
-      const freq = doc.filter((t) => t === term).length;
+      const freq = doc.filter((t: string) => t === term).length;
       if (freq === 0) continue;
       const idf = Math.log(1 + (N - (df[term] ?? 0) + 0.5) / ((df[term] ?? 0) + 0.5));
       const denom = freq + k1 * (1 - b + (b * docLen) / avgLen);

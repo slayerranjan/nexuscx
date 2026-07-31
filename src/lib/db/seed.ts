@@ -1,32 +1,69 @@
 import "./schema";
 import { db } from "./client";
-import { id, createArticle, createConversation, addMessage, updateConversationResolution, assignAgent } from "./queries";
+import {
+  id,
+  createArticle,
+  createConversation,
+  addMessage,
+  updateConversationResolution,
+  assignAgent,
+} from "./queries";
+import { runMigrations } from "./schema";
 import bcrypt from "bcryptjs";
+
+function daysAgo(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekOf(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n * 7);
+  return d.toISOString().slice(0, 10);
+}
 
 async function seed() {
   console.log("Seeding NexusCX demo data...");
 
-  db.exec(`
-    DELETE FROM messages;
-    DELETE FROM conversations;
-    DELETE FROM article_chunks;
-    DELETE FROM knowledge_articles;
-    DELETE FROM agents;
-    DELETE FROM organizations;
-  `);
+  await runMigrations();
+
+  const existingCount = await db.execute(`SELECT COUNT(*) as c FROM conversations`);
+  const count = (existingCount.rows[0] as unknown as { c: number })?.c ?? 0;
+  if (count > 6 && !process.argv.includes("--force")) {
+    console.log(`\nThis database has ${count} conversations (more than the base 6 demo ones).`);
+    console.log("Seeding would DELETE all of them. If you're sure, run: npm run seed -- --force\n");
+    process.exit(1);
+  }
+
+  await db.execute(`DELETE FROM review_drafts`).catch(() => {});
+  await db.execute(`DELETE FROM engagement_signals`).catch(() => {});
+  await db.execute(`DELETE FROM messages`);
+  await db.execute(`DELETE FROM article_chunks`);
+  await db.execute(`DELETE FROM knowledge_articles`);
+  await db.execute(`DELETE FROM conversations`);
+  await db.execute(`DELETE FROM customers`);
+  await db.execute(`DELETE FROM agents`);
+  await db.execute(`DELETE FROM organizations`);
 
   const orgId = id();
-  db.prepare(`INSERT INTO organizations (id, name) VALUES (?, ?)`).run(orgId, "Avtar Retail Co (Demo Workspace)");
+  await db.execute({
+    sql: `INSERT INTO organizations (id, name) VALUES (?, ?)`,
+    args: [orgId, "Avtar Retail Co (Demo Workspace)"],
+  });
 
   // ---- Agents ----
   const passwordHash = await bcrypt.hash("demo1234", 10);
-  const insertAgent = db.prepare(
-    `INSERT INTO agents (id, organization_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`
-  );
   const adminId = id();
   const agentId = id();
-  insertAgent.run(adminId, orgId, "Ritika Shah", "admin@avtarretail.demo", passwordHash, "admin");
-  insertAgent.run(agentId, orgId, "Devansh Rao", "agent@avtarretail.demo", passwordHash, "agent");
+  await db.execute({
+    sql: `INSERT INTO agents (id, organization_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [adminId, orgId, "Ritika Shah", "admin@avtarretail.demo", passwordHash, "admin"],
+  });
+  await db.execute({
+    sql: `INSERT INTO agents (id, organization_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [agentId, orgId, "Devansh Rao", "agent@avtarretail.demo", passwordHash, "agent"],
+  });
 
   // ---- Knowledge base ----
   const articles: Array<[string, string, string]> = [
@@ -73,70 +110,70 @@ async function seed() {
   ];
 
   for (const [title, content, category] of articles) {
-    createArticle({ organizationId: orgId, title, content, category });
+    await createArticle({ organizationId: orgId, title, content, category });
   }
 
-  // ---- Demo conversations (a mix of AI-resolved, escalated, and agent-resolved) ----
+  // ---- Demo conversations ----
 
   // 1. AI-resolved: order tracking
-  const c1 = createConversation({ organizationId: orgId, visitorName: "Ananya Desai" });
-  addMessage({ conversationId: c1.id, sender: "visitor", content: "Hi, when will my order arrive? I ordered 3 days ago." });
-  addMessage({
+  const c1 = await createConversation({ organizationId: orgId, visitorName: "Ananya Desai" });
+  await addMessage({ conversationId: c1.id, sender: "visitor", content: "Hi, when will my order arrive? I ordered 3 days ago." });
+  await addMessage({
     conversationId: c1.id,
     sender: "ai",
     content: "Most orders arrive within 3-5 business days for metro cities. You should receive it soon — you can check the live tracking link sent to your email for the exact status.",
   });
-  addMessage({ conversationId: c1.id, sender: "visitor", content: "Great, thank you!" });
-  updateConversationResolution(c1.id, "ai_resolved", { topicTag: "Order tracking", sentiment: "positive" });
+  await addMessage({ conversationId: c1.id, sender: "visitor", content: "Great, thank you!" });
+  await updateConversationResolution(c1.id, "ai_resolved", { topicTag: "Order tracking", sentiment: "positive" });
 
   // 2. AI-resolved: return policy
-  const c2 = createConversation({ organizationId: orgId, visitorName: "Kabir Malhotra" });
-  addMessage({ conversationId: c2.id, sender: "visitor", content: "Can I return a shirt I bought last week? It doesn't fit." });
-  addMessage({
+  const c2 = await createConversation({ organizationId: orgId, visitorName: "Kabir Malhotra" });
+  await addMessage({ conversationId: c2.id, sender: "visitor", content: "Can I return a shirt I bought last week? It doesn't fit." });
+  await addMessage({
     conversationId: c2.id,
     sender: "ai",
     content: "Yes — items can be returned within 7 days of delivery if unused and in original packaging. Go to Orders, select the item, and choose Request Return. Refunds take 5-7 business days once we receive it.",
   });
-  updateConversationResolution(c2.id, "ai_resolved", { topicTag: "Returns", sentiment: "neutral" });
+  await updateConversationResolution(c2.id, "ai_resolved", { topicTag: "Returns", sentiment: "neutral" });
 
-  // 3. Escalated: damaged item, now assigned to an agent
-  const c3 = createConversation({ organizationId: orgId, visitorName: "Priyanka Nair" });
-  addMessage({ conversationId: c3.id, sender: "visitor", content: "The lamp I ordered arrived completely shattered. I want a replacement." });
-  addMessage({
+  // 3. Escalated: damaged item, assigned to an agent
+  const c3 = await createConversation({ organizationId: orgId, visitorName: "Priyanka Nair" });
+  await addMessage({ conversationId: c3.id, sender: "visitor", content: "The lamp I ordered arrived completely shattered. I want a replacement." });
+  await addMessage({
     conversationId: c3.id,
     sender: "ai",
     content: "I'm really sorry to hear that. Let me connect you with someone who can arrange a replacement and file a damage claim right away.",
     escalationFlag: true,
   });
-  addMessage({ conversationId: c3.id, sender: "agent", content: "Hi Priyanka, so sorry about that — could you share a photo of the damage? I'll get a replacement shipped today." });
-  updateConversationResolution(c3.id, "escalated", { topicTag: "Damaged item", sentiment: "negative" });
-  assignAgent(c3.id, agentId);
+  await addMessage({ conversationId: c3.id, sender: "agent", content: "Hi Priyanka, so sorry about that — could you share a photo of the damage? I'll get a replacement shipped today." });
+  await updateConversationResolution(c3.id, "escalated", { topicTag: "Damaged item", sentiment: "negative" });
+  await assignAgent(c3.id, agentId);
 
-  // 4. Escalated: billing dispute, still open/unassigned
-  const c4 = createConversation({ organizationId: orgId, visitorName: "Rohan Bhatt" });
-  addMessage({ conversationId: c4.id, sender: "visitor", content: "I was charged twice for order #48213. This needs to be fixed now." });
-  addMessage({
+  // 4. Escalated: billing dispute, unassigned
+  const c4 = await createConversation({ organizationId: orgId, visitorName: "Rohan Bhatt" });
+  await addMessage({ conversationId: c4.id, sender: "visitor", content: "I was charged twice for order #48213. This needs to be fixed now." });
+  await addMessage({
     conversationId: c4.id,
     sender: "ai",
     content: "I understand the concern — a duplicate charge needs to be looked at by our team directly since it involves the payment gateway. I'm escalating this to an agent now.",
     escalationFlag: true,
   });
-  updateConversationResolution(c4.id, "escalated", { topicTag: "Billing dispute", sentiment: "negative" });
+  await updateConversationResolution(c4.id, "escalated", { topicTag: "Billing dispute", sentiment: "negative" });
 
-  // 5. AI-resolved: shipping cost question
-  const c5 = createConversation({ organizationId: orgId, visitorName: "Meher Chopra" });
-  addMessage({ conversationId: c5.id, sender: "visitor", content: "Do you offer free shipping?" });
-  addMessage({
+  // 5. AI-resolved: shipping cost
+  const c5 = await createConversation({ organizationId: orgId, visitorName: "Meher Chopra" });
+  await addMessage({ conversationId: c5.id, sender: "visitor", content: "Do you offer free shipping?" });
+  await addMessage({
     conversationId: c5.id,
     sender: "ai",
     content: "Yes — shipping is free on all orders above 999 rupees. Below that, there's a flat 79 rupee shipping fee. Express delivery is also available for select cities at checkout.",
   });
-  updateConversationResolution(c5.id, "ai_resolved", { topicTag: "Shipping cost", sentiment: "positive" });
+  await updateConversationResolution(c5.id, "ai_resolved", { topicTag: "Shipping cost", sentiment: "positive" });
 
-  // 6. Pending: currently open, no resolution yet
-  const c6 = createConversation({ organizationId: orgId, visitorName: "Yash Kulkarni" });
-  addMessage({ conversationId: c6.id, sender: "visitor", content: "Hi, I want to change the delivery address for my order placed 10 minutes ago." });
-  addMessage({
+  // 6. Pending
+  const c6 = await createConversation({ organizationId: orgId, visitorName: "Yash Kulkarni" });
+  await addMessage({ conversationId: c6.id, sender: "visitor", content: "Hi, I want to change the delivery address for my order placed 10 minutes ago." });
+  await addMessage({
     conversationId: c6.id,
     sender: "ai",
     content: "Since it's been under an hour, I can help — but address changes after checkout need an agent to update it before the order ships. Connecting you now.",

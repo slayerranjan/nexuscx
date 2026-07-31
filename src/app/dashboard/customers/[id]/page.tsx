@@ -13,10 +13,10 @@ const RESOLUTION_STYLE: Record<string, { label: string; className: string }> = {
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const agent = await getCurrentAgent();
-  const customer = getCustomer(id);
+  const customer = await getCustomer(id);
   if (!customer || customer.organization_id !== agent!.organization_id) notFound();
 
-  const conversations = getCustomerConversations(id);
+  const conversations = await getCustomerConversations(id);
 
   return (
     <div className="p-8 max-w-3xl">
@@ -28,35 +28,38 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </p>
 
       <div className="space-y-4">
-        {conversations.map((conv) => {
-          const messages = listMessages(conv.id);
-          const style = RESOLUTION_STYLE[conv.resolution];
-          return (
-            <div key={conv.id} className="bg-surface border border-line rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-ink-muted">
-                  {formatDistanceToNow(new Date(conv.created_at + "Z"), { addSuffix: true })} · {conv.topic_tag ?? "Untagged"}
-                </span>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${style.className}`}>
-                  {style.label}
-                </span>
+        {await Promise.all(
+          conversations.map(async (conv) => {
+            const messages = await listMessages(conv.id);
+            const style = RESOLUTION_STYLE[conv.resolution];
+            return (
+              <div key={conv.id} className="bg-surface border border-line rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-ink-muted">
+                    {formatDistanceToNow(new Date(conv.created_at + "Z"), { addSuffix: true })} ·{" "}
+                    {conv.topic_tag ?? "Untagged"}
+                  </span>
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${style.className}`}>
+                    {style.label}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {messages.slice(0, 4).map((m) => (
+                    <p key={m.id} className="text-sm">
+                      <span className="text-ink-muted font-medium">
+                        {m.sender === "visitor" ? "Them: " : m.sender === "agent" ? `${m.agent_name ?? "Agent"}: ` : "AI: "}
+                      </span>
+                      <span className="text-ink">{m.content}</span>
+                    </p>
+                  ))}
+                  {messages.length > 4 && (
+                    <p className="text-xs text-ink-muted">+ {messages.length - 4} more messages</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                {messages.slice(0, 4).map((m) => (
-                  <p key={m.id} className="text-sm">
-                    <span className="text-ink-muted font-medium">
-                      {m.sender === "visitor" ? "Them: " : m.sender === "agent" ? `${m.agent_name ?? "Agent"}: ` : "AI: "}
-                    </span>
-                    <span className="text-ink">{m.content}</span>
-                  </p>
-                ))}
-                {messages.length > 4 && (
-                  <p className="text-xs text-ink-muted">+ {messages.length - 4} more messages</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

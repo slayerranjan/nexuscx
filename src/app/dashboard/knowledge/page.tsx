@@ -8,7 +8,7 @@ export default async function KnowledgePage({
   searchParams: Promise<{ prefillTitle?: string; prefillQuestion?: string }>;
 }) {
   const agent = await getCurrentAgent();
-  const articles = listArticles(agent!.organization_id);
+  const articles = await listArticles(agent!.organization_id);
   const params = await searchParams;
 
   const byCategory = new Map<string, typeof articles>();

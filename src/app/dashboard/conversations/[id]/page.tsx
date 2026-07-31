@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { getCurrentAgent } from "@/lib/auth";
-import { getConversation, listMessages, listAgentsWithLoad } from "@/lib/db/queries";
+import { getConversation, listMessages, listAgentsWithLoad, listAgents } from "@/lib/db/queries";
 import { ReplyBox } from "./reply-box";
 import { CloseButton } from "./close-button";
 import { ClaimButton } from "./claim-button";
+import { ReassignSelect } from "./reassign-select";
 
 const RESOLUTION_STYLE: Record<string, { label: string; className: string }> = {
   ai_resolved: { label: "AI resolved", className: "bg-success-soft text-success" },
@@ -12,14 +13,21 @@ const RESOLUTION_STYLE: Record<string, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-line text-ink-muted" },
 };
 
+const PRIORITY_STYLE: Record<string, { label: string; className: string }> = {
+  high: { label: "High", className: "bg-danger-soft text-danger" },
+  medium: { label: "Medium", className: "bg-warning-soft text-warning" },
+  low: { label: "Low", className: "bg-steel-soft text-navy-deep" },
+};
+
 export default async function ConversationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const agent = await getCurrentAgent();
-  const conversation = getConversation(id);
+  const conversation = await getConversation(id);
   if (!conversation || conversation.organization_id !== agent!.organization_id) notFound();
 
-  const messages = listMessages(id);
+  const messages = await listMessages(id);
   const style = RESOLUTION_STYLE[conversation.resolution];
+  const pStyle = PRIORITY_STYLE[conversation.priority] ?? PRIORITY_STYLE.medium;
 
   const isAdmin = agent!.role === "admin";
   const needsHumanAction = conversation.resolution === "escalated" || conversation.resolution === "pending";
@@ -28,17 +36,28 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   const isSomeoneElses = !isUnassigned && !isMine && !isAdmin;
   const showClaim = needsHumanAction && isUnassigned && !isAdmin;
   const canReply = isAdmin || isMine;
+
   let suggestedName: string | undefined;
   if (isUnassigned) {
-    const withLoad = listAgentsWithLoad(agent!.organization_id).sort((a, b) => a.openCases - b.openCases);
+    const withLoad = (await listAgentsWithLoad(agent!.organization_id)).sort(
+      (a, b) => a.openCases - b.openCases
+    );
     suggestedName = withLoad[0]?.name;
   }
+
+  const allAgentsRaw = isAdmin ? await listAgents(agent!.organization_id) : [];
+  const allAgents = allAgentsRaw.map((a) => ({ id: a.id, name: a.name }));
 
   return (
     <div className="p-8 max-w-3xl">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-lg font-semibold text-ink">{conversation.visitor_name ?? "Website visitor"}</h1>
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${style.className}`}>{style.label}</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${pStyle.className}`}>
+            {pStyle.label}
+          </span>
+          <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${style.className}`}>{style.label}</span>
+        </div>
       </div>
       <p className="text-ink-muted text-sm mb-6">
         {conversation.topic_tag ?? "Untagged"} · {conversation.channel} conversation
@@ -58,6 +77,14 @@ export default async function ConversationDetailPage({ params }: { params: Promi
         </div>
       )}
 
+      {isAdmin && !isUnassigned && (
+        <ReassignSelect
+          conversationId={conversation.id}
+          agents={allAgents}
+          currentAgentId={conversation.assigned_agent_id}
+        />
+      )}
+
       <div className="bg-surface border border-line rounded-lg p-5 space-y-3 mb-5">
         {messages.map((m) => (
           <div key={m.id} className={`flex ${m.sender === "visitor" ? "justify-start" : "justify-end"}`}>
@@ -71,7 +98,8 @@ export default async function ConversationDetailPage({ params }: { params: Promi
               }`}
             >
               <p className="text-[10px] uppercase tracking-wide opacity-70 mb-1">
-{m.sender === "visitor" ? "Visitor" : m.sender === "agent" ? m.agent_name ?? "Agent" : "AI"}              </p>
+                {m.sender === "visitor" ? "Visitor" : m.sender === "agent" ? m.agent_name ?? "Agent" : "AI"}
+              </p>
               {m.content}
               {!!m.escalation_flag && (
                 <p className="text-[11px] mt-1.5 opacity-80">↳ flagged for escalation</p>

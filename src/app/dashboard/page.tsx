@@ -1,21 +1,49 @@
 import { getCurrentAgent } from "@/lib/auth";
-import { getOrgStats, getOrganization } from "@/lib/db/queries";
+import { getOrgStats, getOrganization, getSlaStats } from "@/lib/db/queries";
 
 export default async function OverviewPage() {
   const agent = await getCurrentAgent();
-  const org = getOrganization(agent!.organization_id);
-  const stats = getOrgStats(agent!.organization_id);
+  const org = await getOrganization(agent!.organization_id);
+  const stats = await getOrgStats(agent!.organization_id);
+  const sla = await getSlaStats(agent!.organization_id);
 
   return (
     <div className="p-8 max-w-5xl">
       <h1 className="text-lg font-semibold text-ink">Overview</h1>
       <p className="text-ink-muted text-sm mb-6">{org?.name}</p>
 
-      <div className="grid grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-4 gap-3 mb-6">
         <StatCard label="Total conversations" value={String(stats.total)} />
         <StatCard label="AI resolution rate" value={`${stats.resolutionRate}%`} tone="success" />
         <StatCard label="Escalated to agent" value={String(stats.escalated)} tone="warning" />
         <StatCard label="Pending" value={String(stats.pending)} />
+      </div>
+
+      <div className="bg-surface border border-line rounded-lg p-5 mb-6">
+        <h2 className="text-sm font-medium text-ink mb-4">Response & resolution time</h2>
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard
+            label="Avg. first response"
+            value={sla.avgFirstResponseMinutes !== null ? `${sla.avgFirstResponseMinutes}m` : "—"}
+          />
+          <StatCard
+            label="Resolution — High priority"
+            value={sla.avgResolutionMinutesByPriority.high !== null ? `${sla.avgResolutionMinutesByPriority.high}m` : "—"}
+            tone="warning"
+          />
+          <StatCard
+            label="Resolution — Medium priority"
+            value={sla.avgResolutionMinutesByPriority.medium !== null ? `${sla.avgResolutionMinutesByPriority.medium}m` : "—"}
+          />
+          <StatCard
+            label="Resolution — Low priority"
+            value={sla.avgResolutionMinutesByPriority.low !== null ? `${sla.avgResolutionMinutesByPriority.low}m` : "—"}
+          />
+        </div>
+        <p className="text-xs text-ink-muted mt-3">
+          Resolution time is measured separately per priority level — a High and Low priority case aren&apos;t judged
+          against the same expectation.
+        </p>
       </div>
 
       <div className="bg-surface border border-line rounded-lg p-5">

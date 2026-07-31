@@ -6,17 +6,19 @@ export interface ChatResult {
   escalate: boolean;
   usedContext: string[];
   topic: string | null;
+  priority: "low" | "medium" | "high" | null;
 }
 
 const ESCALATE_TAG = "[[ESCALATE]]";
 const TOPIC_TAG_PATTERN = /\[\[TOPIC:\s*(.+?)\]\]/i;
+const PRIORITY_TAG_PATTERN = /\[\[PRIORITY:\s*(low|medium|high)\]\]/i;
 
 export async function generateChatReply(
   organizationId: string,
   visitorMessage: string,
   history: Message[]
 ): Promise<ChatResult> {
-  const relevant = retrieveRelevantChunks(organizationId, visitorMessage, 4);
+  const relevant = await retrieveRelevantChunks(organizationId, visitorMessage, 4);
   const usedContext = relevant.map((c) => c.chunk_text);
   const systemPrompt = buildSystemPrompt(usedContext);
 
@@ -36,13 +38,19 @@ export async function generateChatReply(
   }
 
   const escalate = text.includes(ESCALATE_TAG);
-  const topicMatch = text.match(TOPIC_TAG_PATTERN);
-  const topic = topicMatch ? topicMatch[1].trim() : null;
-  const reply =
-    text.replace(ESCALATE_TAG, "").replace(TOPIC_TAG_PATTERN, "").trim() ||
-    templateFallback(usedContext).reply;
+    const topicMatch = text.match(TOPIC_TAG_PATTERN);
+    const topic = topicMatch ? topicMatch[1].trim() : null;
+    const priorityMatch = text.match(PRIORITY_TAG_PATTERN);
+    const priority = priorityMatch ? (priorityMatch[1].toLowerCase() as "low" | "medium" | "high") : null;
 
-  return { reply, escalate, usedContext, topic };
+    const reply =
+      text
+        .replace(ESCALATE_TAG, "")
+        .replace(TOPIC_TAG_PATTERN, "")
+        .replace(PRIORITY_TAG_PATTERN, "")
+        .trim() || templateFallback(usedContext).reply;
+
+    return { reply, escalate, usedContext, topic, priority };
 }
 
 async function callGroq(
@@ -186,6 +194,8 @@ Rules:
 - Never invent information not present in the context.
 - Keep replies under 80 words unless the question genuinely requires more.
 - Always end your response with a topic tag on its own line, in this exact format: [[TOPIC: <2-4 word category>]] — for example [[TOPIC: Order tracking]] or [[TOPIC: Billing dispute]]. Use a short, consistent category name a support team would recognize.
+- If you are escalating this conversation, also include a priority tag on its own line, in this exact format: [[PRIORITY: low]], [[PRIORITY: medium]], or [[PRIORITY: high]]. Use "high" for anything involving money, damaged goods, or clear frustration/anger. Use "low" for simple requests that still technically need a human (like a minor detail change). Use "medium" for everything else escalated. Do not include a priority tag if you are not escalating.
+
 
 Knowledge base context:
 ${context.length > 0 ? context.map((c, i) => `[${i + 1}] ${c}`).join("\n\n") : "(no relevant articles found)"}`;
@@ -198,6 +208,7 @@ function templateFallback(context: string[]): ChatResult {
       escalate: true,
       usedContext: context,
       topic: null,
+      priority: null,
     };
   }
   return {
@@ -205,5 +216,6 @@ function templateFallback(context: string[]): ChatResult {
     escalate: false,
     usedContext: context,
     topic: null,
+    priority: null,
   };
 }

@@ -4,7 +4,7 @@ import { GapCard } from "./gap-card";
 
 export default async function KnowledgeGapsPage() {
   const agent = await getCurrentAgent();
-  const gaps = detectKnowledgeGaps(agent!.organization_id, 2);
+  const gaps = await detectKnowledgeGaps(agent!.organization_id, 2);
 
   return (
     <div className="p-8 max-w-4xl">
