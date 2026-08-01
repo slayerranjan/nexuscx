@@ -56,6 +56,10 @@ export function ChatWidget() {
         }),
       });
       const data = await res.json();
+      if (res.status === 429) {
+        setMessages((m) => [...m, { sender: "ai", content: data.error }]);
+        return;
+      }
       setConversationId(data.conversationId);
       setMessages((m) => [...m, { sender: "ai", content: data.reply, escalated: data.escalate }]);
     } catch {

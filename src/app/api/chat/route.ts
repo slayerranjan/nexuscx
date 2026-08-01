@@ -10,6 +10,18 @@ import {
 } from "@/lib/db/queries";
 import { generateChatReply } from "@/lib/ai/chatEngine";
 
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_MAX = 15;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const timestamps = (rateLimitMap.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  timestamps.push(now);
+  rateLimitMap.set(key, timestamps);
+  return timestamps.length > RATE_LIMIT_MAX;
+}
+
 async function getDemoOrgId(): Promise<string> {
   const result = await db.execute(`SELECT id FROM organizations LIMIT 1`);
   const row = result.rows[0] as unknown as { id: string } | undefined;
@@ -29,6 +41,14 @@ export async function POST(req: NextRequest) {
 
   if (!message || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "Message is required." }, { status: 400 });
+  }
+
+  const rateLimitKey = conversationId ?? req.headers.get("x-forwarded-for") ?? "anonymous";
+  if (isRateLimited(rateLimitKey)) {
+    return NextResponse.json(
+      { error: "You're sending messages a bit too fast. Please wait a moment and try again." },
+      { status: 429 }
+    );
   }
 
   const organizationId = await getDemoOrgId();
@@ -67,7 +87,7 @@ export async function POST(req: NextRequest) {
     topicTag: result.topic ?? undefined,
     priority: result.priority ?? undefined,
   });
-  
+
   return NextResponse.json({
     conversationId: conversation.id,
     reply: result.reply,

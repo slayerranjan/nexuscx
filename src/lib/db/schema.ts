@@ -107,4 +107,6 @@ export async function runMigrations() {
 // app (every page and API route imports it indirectly via queries.ts), so
 // new columns/tables get applied to the live database on startup — no more
 // manually running the destructive seed script just to pick up a schema change.
-await runMigrations();
+runMigrations().catch((err) => {
+  console.error("Automatic schema migration failed:", err);
+});
