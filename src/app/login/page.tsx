@@ -6,8 +6,10 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2 mb-1">
-            <NexusMark />
-            <span className="text-surface font-semibold text-lg tracking-tight">NexusCX</span>
+            <div className="bg-white rounded-md p-1.5 flex items-center justify-center">
+              <img src="/avatar-logo.png" alt="Avatar India" className="h-5 w-auto" />
+            </div>
+            <span className="text-surface font-semibold text-lg tracking-tight">AvatarIndiaCX</span>
           </div>
           <p className="text-steel-soft text-sm">AI Customer Experience — Avtar India</p>
         </div>
@@ -25,10 +27,3 @@ export default function LoginPage() {
   );
 }
 
-function NexusMark() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L2 20H8L12 12L16 20H22L12 2Z" fill="#C8A84B" />
-    </svg>
-  );
-}

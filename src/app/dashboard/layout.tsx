@@ -15,10 +15,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen flex">
       <aside className="w-56 bg-navy-deep flex flex-col shrink-0">
         <div className="flex items-center gap-2 px-4 py-5">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 20H8L12 12L16 20H22L12 2Z" fill="#C8A84B" />
-          </svg>
-          <span className="text-white font-semibold text-sm">NexusCX</span>
+          <div className="bg-white rounded-md p-1 flex items-center justify-center">
+            <img src="/avatar-logo.png" alt="Avatar India" className="h-4 w-auto" />
+          </div>
+          <span className="text-white font-semibold text-sm">AvatarIndiaCX</span>
         </div>
         <nav className="flex-1 px-2.5 space-y-0.5">
           <NavLink href="/dashboard">Overview</NavLink>
