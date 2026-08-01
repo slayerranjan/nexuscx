@@ -37,6 +37,7 @@ export interface ArticleChunk {
 export interface Conversation {
   id: string;
   organization_id: string;
+  customer_id: string | null;
   channel: Channel;
   visitor_name: string | null;
   visitor_email: string | null;
@@ -450,4 +451,14 @@ export async function getTeamPerformance(organizationId: string) {
     results.push({ id: a.id, name: a.name, role: a.role, ...stats });
   }
   return results.sort((a, b) => b.resolved - a.resolved);
+}
+
+export async function getOtherCustomerConversations(
+  customerId: string,
+  excludeConversationId: string
+): Promise<Conversation[]> {
+  return dbAll<Conversation>(
+    `SELECT * FROM conversations WHERE customer_id = ? AND id != ? ORDER BY created_at DESC LIMIT 5`,
+    [customerId, excludeConversationId]
+  );
 }
