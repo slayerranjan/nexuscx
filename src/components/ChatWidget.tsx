@@ -14,7 +14,7 @@ export function ChatWidget() {
   const [visitorName, setVisitorName] = useState("");
   const [visitorContact, setVisitorContact] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { sender: "ai", content: "Hi! I'm the Avtar Retail Co assistant. Ask me about your order, returns, shipping, or your account — I'll help right away, or connect you with someone who can." },
+    { sender: "ai", content: "Hi! I'm the Avatar Retail Co assistant. Ask me about your order, returns, shipping, or your account — I'll help right away, or connect you with someone who can." },
   ]);
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export function ChatWidget() {
         <div className="mb-3 w-[360px] h-[480px] bg-surface rounded-xl shadow-2xl border border-line flex flex-col overflow-hidden">
           <div className="bg-navy px-4 py-3 flex items-center justify-between">
             <div>
-              <p className="text-white text-sm font-semibold">Avtar Retail Co</p>
+              <p className="text-white text-sm font-semibold">Avatar Retail Co</p>
               <p className="text-steel-soft text-xs">Usually replies instantly</p>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white text-lg leading-none">

@@ -14,11 +14,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen flex">
       <aside className="w-56 bg-navy-deep flex flex-col shrink-0">
-        <div className="flex items-center gap-2 px-4 py-5">
-          <div className="bg-white rounded-md p-1 flex items-center justify-center">
-            <img src="/avatar-logo.png" alt="Avatar India" className="h-4 w-auto" />
+        <div className="flex items-center px-4 py-5">
+          <div className="bg-white rounded-md px-2.5 py-2 flex items-center justify-center">
+            <img src="/avatar-logo.png" alt="Avatar India" className="h-7 w-auto" />
           </div>
-          <span className="text-white font-semibold text-sm">AvatarIndiaCX</span>
         </div>
         <nav className="flex-1 px-2.5 space-y-0.5">
           <NavLink href="/dashboard">Overview</NavLink>
