@@ -7,11 +7,15 @@ import {
   listAgents,
   getCustomer,
   getOtherCustomerConversations,
+  listCaseNotes,
 } from "@/lib/db/queries";
 import { ReplyBox } from "./reply-box";
 import { CloseButton } from "./close-button";
 import { ClaimButton } from "./claim-button";
 import { ReassignSelect } from "./reassign-select";
+import { CaseNotes } from "./case-notes";
+import { EditableContact } from "./editable-contact";
+import { ReopenButton } from "./reopen-button";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -35,6 +39,13 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   if (!conversation || conversation.organization_id !== agent!.organization_id) notFound();
 
   const messages = await listMessages(id);
+  const notesRaw = await listCaseNotes(id);
+  const notes = notesRaw.map((n) => ({
+    id: n.id,
+    agent_name: n.agent_name,
+    note: n.note,
+    created_at: n.created_at,
+  }));
   const style = RESOLUTION_STYLE[conversation.resolution];
   const pStyle = PRIORITY_STYLE[conversation.priority] ?? PRIORITY_STYLE.medium;
 
@@ -45,6 +56,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   const isSomeoneElses = !isUnassigned && !isMine && !isAdmin;
   const showClaim = needsHumanAction && isUnassigned && !isAdmin;
   const canReply = isAdmin || isMine;
+  const isClosed = conversation.status === "closed";
 
   let suggestedName: string | undefined;
   if (isUnassigned) {
@@ -72,7 +84,6 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   return (
     <div className="p-8 max-w-5xl">
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
-        {/* Case header */}
         <div className="px-5 py-3.5 border-b border-line flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-ink">
@@ -96,7 +107,6 @@ export default async function ConversationDetailPage({ params }: { params: Promi
         )}
 
         <div className="flex">
-          {/* Left — chat thread */}
           <div className="flex-1 min-w-0 p-5 border-r border-line">
             {conversation.resolution === "escalated" && (
               <div className="bg-warning-soft border border-warning/30 rounded-lg px-4 py-3 mb-4 text-sm text-warning">
@@ -114,7 +124,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
                         ? "bg-canvas text-ink border border-line"
                         : m.sender === "agent"
                         ? "bg-navy text-white"
-                        : "bg-steel-soft text-navy-deep"
+                        : "bg-gold-soft text-navy-deep border border-gold/30"
                     }`}
                   >
                     <p className="text-[10px] uppercase tracking-wide opacity-70 mb-1">
@@ -129,21 +139,29 @@ export default async function ConversationDetailPage({ params }: { params: Promi
               ))}
             </div>
 
-            {showClaim && (
-              <div className="mb-4">
-                <ClaimButton conversationId={conversation.id} suggested={suggestedName} />
+            {isClosed ? (
+              <div className="bg-success-soft border border-success/30 rounded-lg px-4 py-2.5 text-sm text-success flex items-center justify-between">
+                <span>✓ This case is closed. A new customer message will automatically reopen it.</span>
+                {canReply && <ReopenButton conversationId={conversation.id} />}
               </div>
-            )}
+            ) : (
+              <>
+                {showClaim && (
+                  <div className="mb-4">
+                    <ClaimButton conversationId={conversation.id} suggested={suggestedName} />
+                  </div>
+                )}
 
-            {canReply && (
-              <div className="flex items-center gap-3">
-                <ReplyBox conversationId={conversation.id} />
-                <CloseButton conversationId={conversation.id} closed={conversation.status === "closed"} />
-              </div>
+                {canReply && (
+                  <div className="flex items-center gap-3">
+                    <ReplyBox conversationId={conversation.id} />
+                    <CloseButton conversationId={conversation.id} closed={false} />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          {/* Right — customer / case details / previous cases */}
           <div className="w-64 shrink-0 p-5 flex flex-col gap-5">
             <div>
               <p className="text-[11px] text-steel uppercase tracking-wide mb-2">Customer</p>
@@ -153,10 +171,15 @@ export default async function ConversationDetailPage({ params }: { params: Promi
                 </div>
                 <p className="text-sm font-medium text-ink">{conversation.visitor_name ?? "Website visitor"}</p>
               </div>
-              <p className="text-xs text-ink-muted mb-1">
-                {customer?.email ?? conversation.visitor_email ?? "No email on file"}
-              </p>
-              <p className="text-xs text-ink-muted">{customer?.phone ?? "No phone on file"}</p>
+              {customer ? (
+                <EditableContact
+                  customerId={customer.id}
+                  currentEmail={customer.email}
+                  currentPhone={customer.phone}
+                />
+              ) : (
+                <p className="text-xs text-ink-muted">No customer record linked.</p>
+              )}
             </div>
 
             <div className="border-t border-line pt-4">
@@ -182,6 +205,8 @@ export default async function ConversationDetailPage({ params }: { params: Promi
                 />
               </div>
             )}
+
+            <CaseNotes conversationId={conversation.id} notes={notes} />
 
             <div className="border-t border-line pt-4">
               <p className="text-[11px] text-steel uppercase tracking-wide mb-2">Previous cases</p>

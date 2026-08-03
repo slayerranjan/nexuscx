@@ -4,7 +4,7 @@ export default function WidgetDemoPage() {
   return (
     <div className="min-h-screen bg-canvas">
       <header className="bg-surface border-b border-line px-8 py-4 flex items-center justify-between">
-        <span className="font-semibold text-navy text-lg">Avtar Retail Co</span>
+        <span className="font-semibold text-navy text-lg">Avatar Retail Co</span>
         <nav className="flex gap-6 text-sm text-ink-muted">
           <span>Shop</span>
           <span>Orders</span>

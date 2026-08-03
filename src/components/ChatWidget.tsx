@@ -21,9 +21,38 @@ export function ChatWidget() {
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Tracks how many messages actually exist in the DATABASE — deliberately
+  // separate from the local `messages` array shown on screen, since that
+  // array also includes the greeting line above, which is never saved
+  // server-side. Comparing against the wrong count was the original bug.
+  const serverMessageCountRef = useRef(0);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, open, contactSubmitted]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/chat/${conversationId}/messages`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverMessages: ChatMessage[] = data.messages ?? [];
+
+        if (serverMessages.length > serverMessageCountRef.current) {
+          const newOnes = serverMessages.slice(serverMessageCountRef.current);
+          setMessages((m) => [...m, ...newOnes]);
+          serverMessageCountRef.current = serverMessages.length;
+        }
+      } catch {
+        // silent — a missed poll just tries again in 4 seconds
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [conversationId]);
 
   function handleContactSubmit() {
     if (!visitorName.trim()) return;
@@ -56,12 +85,16 @@ export function ChatWidget() {
         }),
       });
       const data = await res.json();
-      if (res.status === 429) {
-        setMessages((m) => [...m, { sender: "ai", content: data.error }]);
-        return;
-      }
       setConversationId(data.conversationId);
-      setMessages((m) => [...m, { sender: "ai", content: data.reply, escalated: data.escalate }]);
+
+      if (data.humanHandling) {
+        // Only the visitor's message was actually saved server-side here —
+        // no reply to show, since a real agent reply will arrive via polling.
+        serverMessageCountRef.current += 1;
+      } else {
+        setMessages((m) => [...m, { sender: "ai", content: data.reply, escalated: data.escalate }]);
+        serverMessageCountRef.current += 2;
+      }
     } catch {
       setMessages((m) => [...m, { sender: "ai", content: "Sorry, something went wrong. Please try again." }]);
     } finally {
@@ -124,6 +157,9 @@ export function ChatWidget() {
                           : "bg-surface text-ink border border-line rounded-bl-sm"
                       }`}
                     >
+                      {m.sender === "agent" && (
+                        <p className="text-[10px] uppercase tracking-wide text-steel mb-1">Support agent</p>
+                      )}
                       {m.content}
                       {m.escalated && (
                         <div className="mt-1.5 pt-1.5 border-t border-line/50 text-[11px] text-steel flex items-center gap-1">

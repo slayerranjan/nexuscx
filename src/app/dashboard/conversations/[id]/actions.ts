@@ -1,9 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { addMessage, closeConversation, updateConversationResolution, assignAgent, getConversation, listMessages } from "@/lib/db/queries";
+import {
+  addMessage,
+  closeConversation,
+  updateConversationResolution,
+  assignAgent,
+  getConversation,
+  listMessages,
+  addCaseNote,
+  updateCustomerContact,
+} from "@/lib/db/queries";
 import { getCurrentAgent } from "@/lib/auth";
 import { suggestAgentReply } from "@/lib/ai/suggestReply";
+import { db } from "@/lib/db/client";
 
 function canAct(conversation: { assigned_agent_id: string | null }, agent: { id: string; role: string }) {
   if (agent.role === "admin") return true;
@@ -42,6 +52,18 @@ export async function markClosed(conversationId: string) {
   revalidatePath("/dashboard/conversations");
 }
 
+export async function reopenCase(conversationId: string) {
+  const agent = await getCurrentAgent();
+  const conversation = await getConversation(conversationId);
+  if (!agent || !conversation || !canAct(conversation, agent)) return;
+  await db.execute({
+    sql: `UPDATE conversations SET status = 'open', updated_at = datetime('now') WHERE id = ?`,
+    args: [conversationId],
+  });
+  revalidatePath(`/dashboard/conversations/${conversationId}`);
+  revalidatePath("/dashboard/conversations");
+}
+
 export async function getSuggestion(conversationId: string) {
   const agent = await getCurrentAgent();
   const conversation = await getConversation(conversationId);
@@ -57,4 +79,21 @@ export async function reassignCase(conversationId: string, newAgentId: string) {
   await assignAgent(conversationId, newAgentId);
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
+}
+
+export async function saveNote(conversationId: string, note: string) {
+  const agent = await getCurrentAgent();
+  if (!agent || !note.trim()) return;
+  await addCaseNote({ conversationId, agentName: agent.name, note: note.trim() });
+  revalidatePath(`/dashboard/conversations/${conversationId}`);
+}
+
+export async function updateContact(
+  customerId: string,
+  data: { name?: string; email?: string; phone?: string }
+) {
+  const agent = await getCurrentAgent();
+  if (!agent) return;
+  await updateCustomerContact(customerId, data);
+  revalidatePath(`/dashboard/conversations`);
 }

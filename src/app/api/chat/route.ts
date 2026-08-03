@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import "@/lib/db/schema";
+
 import {
   createConversation,
   addMessage,
   listMessages,
   updateConversationResolution,
   findOrCreateCustomer,
+  getConversation,
 } from "@/lib/db/queries";
+
 import { generateChatReply } from "@/lib/ai/chatEngine";
 
 const rateLimitMap = new Map<string, number[]>();
@@ -56,12 +59,17 @@ export async function POST(req: NextRequest) {
   let conversation: { id: string };
   if (conversationId) {
     conversation = { id: conversationId };
+    // Reopen if it was closed — a customer replying means it's active again.
+    await db.execute({
+      sql: `UPDATE conversations SET status = 'open', updated_at = datetime('now') WHERE id = ? AND status = 'closed'`,
+      args: [conversationId],
+    });
   } else {
     const customer = await findOrCreateCustomer({
       organizationId,
       name: visitorName,
-      email: visitorEmail,
-      phone: visitorPhone,
+      email: visitorEmail?.trim().toLowerCase(),
+      phone: visitorPhone?.trim(),
     });
     conversation = await createConversation({
       organizationId,
@@ -72,6 +80,17 @@ export async function POST(req: NextRequest) {
   }
 
   await addMessage({ conversationId: conversation.id, sender: "visitor", content: message.trim() });
+
+  const fullConversation = await getConversation(conversation.id);
+
+  if (fullConversation?.assigned_agent_id) {
+    return NextResponse.json({
+      conversationId: conversation.id,
+      reply: "Thanks — your message has been sent to our support agent, who will respond shortly.",
+      escalate: false,
+      humanHandling: true,
+    });
+  }
 
   const history = await listMessages(conversation.id);
   const result = await generateChatReply(organizationId, message.trim(), history);

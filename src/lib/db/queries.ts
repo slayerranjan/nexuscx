@@ -307,7 +307,7 @@ export async function findOrCreateCustomer(input: {
 }): Promise<Customer> {
   if (input.email) {
     const existing = await dbGet<Customer>(
-      `SELECT * FROM customers WHERE organization_id = ? AND email = ?`,
+      `SELECT * FROM customers WHERE organization_id = ? AND LOWER(email) = LOWER(?)`,
       [input.organizationId, input.email]
     );
     if (existing) return existing;
@@ -460,5 +460,49 @@ export async function getOtherCustomerConversations(
   return dbAll<Conversation>(
     `SELECT * FROM conversations WHERE customer_id = ? AND id != ? ORDER BY created_at DESC LIMIT 5`,
     [customerId, excludeConversationId]
+  );
+}
+
+// ---------- case notes ----------
+export interface CaseNote {
+  id: string;
+  conversation_id: string;
+  agent_name: string;
+  note: string;
+  created_at: string;
+}
+
+export async function listCaseNotes(conversationId: string): Promise<CaseNote[]> {
+  return dbAll<CaseNote>(
+    `SELECT * FROM case_notes WHERE conversation_id = ? ORDER BY created_at DESC`,
+    [conversationId]
+  );
+}
+
+export async function addCaseNote(input: {
+  conversationId: string;
+  agentName: string;
+  note: string;
+}): Promise<CaseNote> {
+  const noteId = id();
+  await dbRun(
+    `INSERT INTO case_notes (id, conversation_id, agent_name, note) VALUES (?, ?, ?, ?)`,
+    [noteId, input.conversationId, input.agentName, input.note]
+  );
+  return (await dbGet<CaseNote>(`SELECT * FROM case_notes WHERE id = ?`, [noteId]))!;
+}
+
+// ---------- editable customer contact info ----------
+export async function updateCustomerContact(
+  customerId: string,
+  input: { name?: string; email?: string; phone?: string }
+): Promise<void> {
+  await dbRun(
+    `UPDATE customers SET
+      name = COALESCE(NULLIF(?, ''), name),
+      email = COALESCE(NULLIF(?, ''), email),
+      phone = COALESCE(NULLIF(?, ''), phone)
+     WHERE id = ?`,
+    [input.name ?? "", input.email ?? "", input.phone ?? "", customerId]
   );
 }

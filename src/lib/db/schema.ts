@@ -67,6 +67,13 @@ export async function runMigrations() {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
+    `CREATE TABLE IF NOT EXISTS case_notes (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+      agent_name TEXT NOT NULL,
+      note TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     `CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -84,6 +91,7 @@ export async function runMigrations() {
     `CREATE INDEX IF NOT EXISTS idx_customers_org ON customers(organization_id)`,
     `CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)`,
     `CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)`,
+    `CREATE INDEX IF NOT EXISTS idx_case_notes_conversation ON case_notes(conversation_id)`,
   ];
 
   for (const sql of statements) {
