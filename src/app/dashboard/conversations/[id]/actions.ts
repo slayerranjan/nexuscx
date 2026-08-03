@@ -97,3 +97,15 @@ export async function updateContact(
   await updateCustomerContact(customerId, data);
   revalidatePath(`/dashboard/conversations`);
 }
+
+export async function setIssueCategory(conversationId: string, category: string) {
+  const agent = await getCurrentAgent();
+  const conversation = await getConversation(conversationId);
+  if (!agent || !conversation || !canAct(conversation, agent)) return;
+  await db.execute({
+    sql: `UPDATE conversations SET issue_category = ?, updated_at = datetime('now') WHERE id = ?`,
+    args: [category, conversationId],
+  });
+  revalidatePath(`/dashboard/conversations/${conversationId}`);
+  revalidatePath("/dashboard/conversations");
+}

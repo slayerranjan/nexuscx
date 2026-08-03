@@ -16,6 +16,7 @@ import { ReassignSelect } from "./reassign-select";
 import { CaseNotes } from "./case-notes";
 import { EditableContact } from "./editable-contact";
 import { ReopenButton } from "./reopen-button";
+import { IssueCategory } from "./issue-category";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -190,10 +191,11 @@ export default async function ConversationDetailPage({ params }: { params: Promi
                   {allAgentsRaw.find((a) => a.id === conversation.assigned_agent_id)?.name ?? "Unassigned"}
                 </span>
               </div>
-              <div className="flex justify-between text-xs">
+              <div className="flex justify-between text-xs mb-3">
                 <span className="text-ink-muted">Channel</span>
                 <span className="text-ink capitalize">{conversation.channel}</span>
               </div>
+              <IssueCategory conversationId={conversation.id} current={conversation.issue_category ?? null} />
             </div>
 
             {isAdmin && !isUnassigned && (
