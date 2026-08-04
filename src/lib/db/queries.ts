@@ -507,3 +507,20 @@ export async function updateCustomerContact(
     [input.name ?? "", input.email ?? "", input.phone ?? "", customerId]
   );
 }
+
+// ---------- live typing indicator ----------
+export async function setAgentTyping(conversationId: string): Promise<void> {
+  // Flag expires 6 seconds from now — if the agent stops typing, this
+  // naturally clears itself without needing a separate "stopped" signal.
+  const expiresAt = new Date(Date.now() + 6000).toISOString();
+  await dbRun(`UPDATE conversations SET agent_typing_until = ? WHERE id = ?`, [expiresAt, conversationId]);
+}
+
+export async function isAgentCurrentlyTyping(conversationId: string): Promise<boolean> {
+  const row = await dbGet<{ agent_typing_until: string | null }>(
+    `SELECT agent_typing_until FROM conversations WHERE id = ?`,
+    [conversationId]
+  );
+  if (!row?.agent_typing_until) return false;
+  return new Date(row.agent_typing_until).getTime() > Date.now();
+}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listMessages } from "@/lib/db/queries";
+import { listMessages, getConversation, getAgentById, isAgentCurrentlyTyping } from "@/lib/db/queries";
 
 export async function GET(
   req: NextRequest,
@@ -11,6 +11,15 @@ export async function GET(
   }
 
   const messages = await listMessages(conversationId);
+  const conversation = await getConversation(conversationId);
+
+  let agentName: string | null = null;
+  if (conversation?.assigned_agent_id) {
+    const agent = await getAgentById(conversation.assigned_agent_id);
+    agentName = agent?.name ?? null;
+  }
+
+  const agentTyping = await isAgentCurrentlyTyping(conversationId);
 
   return NextResponse.json({
     messages: messages.map((m) => ({
@@ -18,5 +27,8 @@ export async function GET(
       content: m.content,
       escalated: !!m.escalation_flag,
     })),
+    agentName,
+    caseClosed: conversation?.status === "closed",
+    agentTyping,
   });
 }

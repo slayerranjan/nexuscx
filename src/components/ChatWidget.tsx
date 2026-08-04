@@ -19,17 +19,16 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [assignedAgentName, setAssignedAgentName] = useState<string | null>(null);
+  const [caseClosed, setCaseClosed] = useState(false);
+  const [agentTyping, setAgentTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Tracks how many messages actually exist in the DATABASE — deliberately
-  // separate from the local `messages` array shown on screen, since that
-  // array also includes the greeting line above, which is never saved
-  // server-side. Comparing against the wrong count was the original bug.
   const serverMessageCountRef = useRef(0);
+  const firstAgentMessageIndex = messages.findIndex((m) => m.sender === "agent");
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, open, contactSubmitted]);
+  }, [messages, open, contactSubmitted, agentTyping]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -46,10 +45,14 @@ export function ChatWidget() {
           setMessages((m) => [...m, ...newOnes]);
           serverMessageCountRef.current = serverMessages.length;
         }
+
+        setAssignedAgentName(data.agentName ?? null);
+        setCaseClosed(!!data.caseClosed);
+        setAgentTyping(!!data.agentTyping);
       } catch {
         // silent — a missed poll just tries again in 4 seconds
       }
-    }, 4000);
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [conversationId]);
@@ -88,8 +91,6 @@ export function ChatWidget() {
       setConversationId(data.conversationId);
 
       if (data.humanHandling) {
-        // Only the visitor's message was actually saved server-side here —
-        // no reply to show, since a real agent reply will arrive via polling.
         serverMessageCountRef.current += 1;
       } else {
         setMessages((m) => [...m, { sender: "ai", content: data.reply, escalated: data.escalate }]);
@@ -109,7 +110,9 @@ export function ChatWidget() {
           <div className="bg-navy px-4 py-3 flex items-center justify-between">
             <div>
               <p className="text-white text-sm font-semibold">Avatar Retail Co</p>
-              <p className="text-steel-soft text-xs">Usually replies instantly</p>
+              <p className="text-steel-soft text-xs">
+                {assignedAgentName ? `${assignedAgentName} is handling your case` : "Usually replies instantly"}
+              </p>
             </div>
             <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white text-lg leading-none">
               ×
@@ -149,27 +152,57 @@ export function ChatWidget() {
             <>
               <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-canvas">
                 {messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.sender === "visitor" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-                        m.sender === "visitor"
-                          ? "bg-navy text-white rounded-br-sm"
-                          : "bg-surface text-ink border border-line rounded-bl-sm"
-                      }`}
-                    >
-                      {m.sender === "agent" && (
-                        <p className="text-[10px] uppercase tracking-wide text-steel mb-1">Support agent</p>
-                      )}
-                      {m.content}
-                      {m.escalated && (
-                        <div className="mt-1.5 pt-1.5 border-t border-line/50 text-[11px] text-steel flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
-                          Connecting you with a team member
-                        </div>
-                      )}
+                  <div key={i}>
+                    {assignedAgentName && i === firstAgentMessageIndex && (
+                      <div className="flex justify-center py-1">
+                        <span className="text-[11px] text-steel bg-steel-soft px-2.5 py-1 rounded-full">
+                          {assignedAgentName} joined the conversation
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex ${m.sender === "visitor" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+                          m.sender === "visitor"
+                            ? "bg-navy text-white rounded-br-sm"
+                            : m.sender === "agent"
+                            ? "bg-gold-soft text-navy-deep border border-gold/30 rounded-bl-sm"
+                            : "bg-surface text-ink border border-line rounded-bl-sm"
+                        }`}
+                      >
+                        {m.sender === "agent" && (
+                          <p className="text-[10px] uppercase tracking-wide text-navy-deep/70 mb-1">
+                            {assignedAgentName ?? "Support agent"}
+                          </p>
+                        )}
+                        {m.content}
+                        {m.escalated && (
+                          <div className="mt-1.5 pt-1.5 border-t border-line/50 text-[11px] text-steel flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-warning inline-block" />
+                            Connecting you with a team member
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
+
+                {agentTyping && !caseClosed && (
+                  <div className="flex justify-start">
+                    <div className="bg-gold-soft border border-gold/30 rounded-lg rounded-bl-sm px-3 py-2 text-sm text-navy-deep">
+                      {assignedAgentName ?? "Agent"} is typing…
+                    </div>
+                  </div>
+                )}
+
+                {caseClosed && (
+                  <div className="flex justify-center">
+                    <span className="text-[11px] text-success bg-success-soft px-3 py-1.5 rounded-full">
+                      ✓ This conversation has been marked resolved
+                    </span>
+                  </div>
+                )}
+
                 {sending && (
                   <div className="flex justify-start">
                     <div className="bg-surface border border-line rounded-lg rounded-bl-sm px-3 py-2 text-sm text-ink-muted">

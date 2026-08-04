@@ -17,6 +17,7 @@ import { CaseNotes } from "./case-notes";
 import { EditableContact } from "./editable-contact";
 import { ReopenButton } from "./reopen-button";
 import { IssueCategory } from "./issue-category";
+import { LiveMessages } from "./live-messages";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
@@ -116,29 +117,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
               </div>
             )}
 
-            <div className="space-y-3 mb-5">
-              {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.sender === "visitor" ? "justify-start" : "justify-end"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${
-                      m.sender === "visitor"
-                        ? "bg-canvas text-ink border border-line"
-                        : m.sender === "agent"
-                        ? "bg-navy text-white"
-                        : "bg-gold-soft text-navy-deep border border-gold/30"
-                    }`}
-                  >
-                    <p className="text-[10px] uppercase tracking-wide opacity-70 mb-1">
-                      {m.sender === "visitor" ? "Visitor" : m.sender === "agent" ? m.agent_name ?? "Agent" : "AI"}
-                    </p>
-                    {m.content}
-                    {!!m.escalation_flag && (
-                      <p className="text-[11px] mt-1.5 opacity-80">↳ flagged for escalation</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <LiveMessages conversationId={conversation.id} initialMessages={messages} />
 
             {isClosed ? (
               <div className="bg-success-soft border border-success/30 rounded-lg px-4 py-2.5 text-sm text-success flex items-center justify-between">

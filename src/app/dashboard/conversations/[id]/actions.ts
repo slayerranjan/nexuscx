@@ -10,6 +10,7 @@ import {
   listMessages,
   addCaseNote,
   updateCustomerContact,
+  setAgentTyping,
 } from "@/lib/db/queries";
 import { getCurrentAgent } from "@/lib/auth";
 import { suggestAgentReply } from "@/lib/ai/suggestReply";
@@ -108,4 +109,10 @@ export async function setIssueCategory(conversationId: string, category: string)
   });
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
+}
+
+export async function signalTyping(conversationId: string) {
+  const agent = await getCurrentAgent();
+  if (!agent) return;
+  await setAgentTyping(conversationId);
 }
