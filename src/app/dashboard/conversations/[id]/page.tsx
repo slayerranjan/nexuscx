@@ -40,7 +40,14 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   const conversation = await getConversation(id);
   if (!conversation || conversation.organization_id !== agent!.organization_id) notFound();
 
-  const messages = await listMessages(id);
+const messagesRaw = await listMessages(id);
+  const messages = messagesRaw.map((m) => ({
+    id: m.id,
+    sender: m.sender,
+    content: m.content,
+    agent_name: m.agent_name,
+    escalation_flag: m.escalation_flag,
+  }));
   const notesRaw = await listCaseNotes(id);
   const notes = notesRaw.map((n) => ({
     id: n.id,
