@@ -9,7 +9,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!agent) redirect("/login");
 
   const unassignedCount = await getUnassignedEscalatedCount(agent.organization_id);
-  const isAdmin = agent.role === "admin";
+const isAdmin = agent.role === "admin";
+const isSuperAdmin = !!agent.is_super_admin;
 
   return (
     <div className="min-h-screen flex">
@@ -25,6 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             Live queue
           </NavLink>
           {isAdmin && <NavLink href="/dashboard/team">Team performance</NavLink>}
+          {isSuperAdmin && <NavLink href="/dashboard/organizations">Organizations</NavLink>}
           <NavLink href="/dashboard/customers">Customers</NavLink>
           <NavLink href="/dashboard/knowledge">Knowledge base</NavLink>
           <NavLink href="/dashboard/knowledge-gaps">Knowledge gaps</NavLink>

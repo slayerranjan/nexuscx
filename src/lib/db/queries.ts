@@ -16,6 +16,7 @@ export interface AgentRecord {
   email: string;
   password_hash: string;
   role: Role;
+  is_super_admin: number;
 }
 
 export interface KnowledgeArticle {
@@ -523,4 +524,34 @@ export async function isAgentCurrentlyTyping(conversationId: string): Promise<bo
   );
   if (!row?.agent_typing_until) return false;
   return new Date(row.agent_typing_until).getTime() > Date.now();
+}
+
+
+// ---------- multi-tenant: organization creation ----------
+export async function createOrganizationWithAdmin(input: {
+  organizationName: string;
+  adminName: string;
+  adminEmail: string;
+  adminPasswordHash: string;
+}): Promise<{ organizationId: string; agentId: string }> {
+  const orgId = id();
+  await dbRun(`INSERT INTO organizations (id, name) VALUES (?, ?)`, [orgId, input.organizationName]);
+
+  const agentId = id();
+  await dbRun(
+    `INSERT INTO agents (id, organization_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, 'admin')`,
+    [agentId, orgId, input.adminName, input.adminEmail.toLowerCase().trim(), input.adminPasswordHash]
+  );
+
+  return { organizationId: orgId, agentId };
+}
+
+export async function listAllOrganizations(): Promise<{ id: string; name: string; created_at: string; agentCount: number }[]> {
+  return dbAll(
+    `SELECT o.id, o.name, o.created_at, COUNT(a.id) as agentCount
+     FROM organizations o
+     LEFT JOIN agents a ON a.organization_id = o.id
+     GROUP BY o.id
+     ORDER BY o.created_at DESC`
+  );
 }

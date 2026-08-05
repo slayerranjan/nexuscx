@@ -25,6 +25,7 @@ export async function runMigrations() {
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('admin','agent')),
+      is_super_admin INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS customers (
@@ -115,6 +116,12 @@ export async function runMigrations() {
 
 try {
     await db.execute(`ALTER TABLE conversations ADD COLUMN issue_category TEXT;`);
+  } catch {
+    // already exists — safe to ignore
+  }
+
+  try {
+    await db.execute(`ALTER TABLE agents ADD COLUMN is_super_admin INTEGER NOT NULL DEFAULT 0;`);
   } catch {
     // already exists — safe to ignore
   }
