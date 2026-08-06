@@ -209,8 +209,8 @@ export async function getOrgStats(organizationId: string) {
   const conversations = await listConversations(organizationId);
   const total = conversations.length;
   const aiResolved = conversations.filter((c) => c.resolution === "ai_resolved").length;
-  const escalated = conversations.filter((c) => c.resolution === "escalated").length;
-  const agentResolved = conversations.filter((c) => c.resolution === "agent_resolved").length;
+  const escalated = conversations.filter((c) => c.resolution === "escalated" && c.status === "open").length;
+  const agentResolved = conversations.filter((c) => c.resolution === "agent_resolved" || (c.resolution === "escalated" && c.status === "closed")).length;
   const pending = conversations.filter((c) => c.resolution === "pending" && c.status === "open").length;
 
   const resolutionRate = total === 0 ? 0 : Math.round((aiResolved / total) * 100);
@@ -554,4 +554,19 @@ export async function listAllOrganizations(): Promise<{ id: string; name: string
      GROUP BY o.id
      ORDER BY o.created_at DESC`
   );
+}
+
+export async function getClosedWithoutReplyIds(organizationId: string): Promise<Set<string>> {
+  const rows = await dbAll<{ id: string }>(
+    `SELECT c.id FROM conversations c
+     WHERE c.organization_id = ? AND c.status = 'closed'
+     AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender = 'agent')`,
+    [organizationId]
+  );
+  return new Set(rows.map((r) => r.id));
+}
+
+export async function getOrgIdByEmbedKey(embedKey: string): Promise<string | null> {
+  const row = await dbGet<{ id: string }>(`SELECT id FROM organizations WHERE embed_key = ?`, [embedKey]);
+  return row?.id ?? null;
 }

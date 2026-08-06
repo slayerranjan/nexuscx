@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import "@/lib/db/schema";
-
 import {
   createConversation,
   addMessage,
@@ -9,8 +8,8 @@ import {
   updateConversationResolution,
   findOrCreateCustomer,
   getConversation,
+  getOrgIdByEmbedKey,
 } from "@/lib/db/queries";
-
 import { generateChatReply } from "@/lib/ai/chatEngine";
 
 const rateLimitMap = new Map<string, number[]>();
@@ -30,6 +29,17 @@ async function getDemoOrgId(): Promise<string> {
   const row = result.rows[0] as unknown as { id: string } | undefined;
   if (!row) throw new Error("No organization found — run `npm run seed` first.");
   return row.id;
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, x-embed-key",
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -54,12 +64,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const organizationId = await getDemoOrgId();
+  const embedKey = req.headers.get("x-embed-key");
+  let organizationId: string;
+
+  if (embedKey) {
+    const foundOrgId = await getOrgIdByEmbedKey(embedKey);
+    if (!foundOrgId) {
+      return NextResponse.json({ error: "Invalid embed key." }, { status: 403 });
+    }
+    organizationId = foundOrgId;
+  } else {
+    organizationId = await getDemoOrgId();
+  }
 
   let conversation: { id: string };
   if (conversationId) {
     conversation = { id: conversationId };
-    // Reopen if it was closed — a customer replying means it's active again.
     await db.execute({
       sql: `UPDATE conversations SET status = 'open', updated_at = datetime('now') WHERE id = ? AND status = 'closed'`,
       args: [conversationId],
@@ -84,12 +104,15 @@ export async function POST(req: NextRequest) {
   const fullConversation = await getConversation(conversation.id);
 
   if (fullConversation?.assigned_agent_id) {
-    return NextResponse.json({
-      conversationId: conversation.id,
-      reply: "Thanks — your message has been sent to our support agent, who will respond shortly.",
-      escalate: false,
-      humanHandling: true,
-    });
+    return NextResponse.json(
+      {
+        conversationId: conversation.id,
+        reply: "Thanks — your message has been sent to our support agent, who will respond shortly.",
+        escalate: false,
+        humanHandling: true,
+      },
+      { headers: { "Access-Control-Allow-Origin": "*" } }
+    );
   }
 
   const history = await listMessages(conversation.id);
@@ -107,9 +130,12 @@ export async function POST(req: NextRequest) {
     priority: result.priority ?? undefined,
   });
 
-  return NextResponse.json({
-    conversationId: conversation.id,
-    reply: result.reply,
-    escalate: result.escalate,
-  });
+  return NextResponse.json(
+    {
+      conversationId: conversation.id,
+      reply: result.reply,
+      escalate: result.escalate,
+    },
+    { headers: { "Access-Control-Allow-Origin": "*" } }
+  );
 }

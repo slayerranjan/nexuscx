@@ -16,7 +16,8 @@ export async function runMigrations() {
     `CREATE TABLE IF NOT EXISTS organizations (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      embed_key TEXT
     )`,
     `CREATE TABLE IF NOT EXISTS agents (
       id TEXT PRIMARY KEY,
@@ -139,3 +140,9 @@ try {
 runMigrations().catch((err) => {
   console.error("Automatic schema migration failed:", err);
 });
+
+try {
+    await db.execute(`ALTER TABLE organizations ADD COLUMN embed_key TEXT;`);
+  } catch {
+    // already exists — safe to ignore
+  }

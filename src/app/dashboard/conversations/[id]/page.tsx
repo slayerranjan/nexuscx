@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { getCurrentAgent } from "@/lib/auth";
 import {
   getConversation,
@@ -40,7 +40,7 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   const conversation = await getConversation(id);
   if (!conversation || conversation.organization_id !== agent!.organization_id) notFound();
 
-const messagesRaw = await listMessages(id);
+  const messagesRaw = await listMessages(id);
   const messages = messagesRaw.map((m) => ({
     id: m.id,
     sender: m.sender,
@@ -48,6 +48,7 @@ const messagesRaw = await listMessages(id);
     agent_name: m.agent_name,
     escalation_flag: m.escalation_flag,
   }));
+
   const notesRaw = await listCaseNotes(id);
   const notes = notesRaw.map((n) => ({
     id: n.id,
@@ -55,6 +56,7 @@ const messagesRaw = await listMessages(id);
     note: n.note,
     created_at: n.created_at,
   }));
+
   const style = RESOLUTION_STYLE[conversation.resolution];
   const pStyle = PRIORITY_STYLE[conversation.priority] ?? PRIORITY_STYLE.medium;
 
@@ -96,7 +98,7 @@ const messagesRaw = await listMessages(id);
         <div className="px-5 py-3.5 border-b border-line flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-ink">
-              Case #{conversation.id.slice(0, 6)} · {conversation.topic_tag ?? "Untagged"}
+              Case #{conversation.id.slice(0, 6)} - {conversation.topic_tag ?? "Untagged"}
             </p>
             <p className="text-xs text-ink-muted mt-0.5">
               Opened {formatDistanceToNow(new Date(conversation.created_at + "Z"), { addSuffix: true })}
@@ -119,8 +121,8 @@ const messagesRaw = await listMessages(id);
           <div className="flex-1 min-w-0 p-5 border-r border-line">
             {conversation.resolution === "escalated" && (
               <div className="bg-warning-soft border border-warning/30 rounded-lg px-4 py-3 mb-4 text-sm text-warning">
-                The AI couldn&apos;t confidently resolve this — read below for its attempted answer before
-                replying, so you&apos;re not starting from scratch.
+                The AI could not confidently resolve this - read below for its attempted answer before
+                replying, so you are not starting from scratch.
               </div>
             )}
 
@@ -128,7 +130,7 @@ const messagesRaw = await listMessages(id);
 
             {isClosed ? (
               <div className="bg-success-soft border border-success/30 rounded-lg px-4 py-2.5 text-sm text-success flex items-center justify-between">
-                <span>✓ This case is closed. A new customer message will automatically reopen it.</span>
+                <span>This case is closed. A new customer message will automatically reopen it.</span>
                 {canReply && <ReopenButton conversationId={conversation.id} />}
               </div>
             ) : (
@@ -208,7 +210,7 @@ const messagesRaw = await listMessages(id);
                       href={`/dashboard/conversations/${pc.id}`}
                       className="block text-xs text-navy hover:underline"
                     >
-                      #{pc.id.slice(0, 6)} · {pc.topic_tag ?? "Untagged"}
+                      #{pc.id.slice(0, 6)} - {pc.topic_tag ?? "Untagged"}
                     </Link>
                   ))}
                 </div>

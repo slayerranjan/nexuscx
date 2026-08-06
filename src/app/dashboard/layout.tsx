@@ -36,7 +36,7 @@ const isSuperAdmin = !!agent.is_super_admin;
         </nav>
         <div className="px-4 py-4 border-t border-white/10">
           <p className="text-white text-sm">{agent.name}</p>
-          <p className="text-steel-soft text-xs mb-2 capitalize">{agent.role}</p>
+          <p className="text-steel-soft text-xs mb-2">{agent.role === "admin" ? "Team Lead" : "Agent"}</p>
           <SignOutButton />
         </div>
       </aside>
@@ -64,7 +64,15 @@ function NavLink({
     >
       <span>{children}</span>
       {!!badge && badge > 0 && (
-        <span className="bg-danger text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+        <span
+          className={`text-white text-[10px] font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 transition-colors ${
+            badge > 50
+              ? "bg-danger badge-urgent"
+              : badge >= 20
+              ? "bg-warning"
+              : "bg-success"
+          }`}
+        >
           {badge}
         </span>
       )}

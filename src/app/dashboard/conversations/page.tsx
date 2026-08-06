@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getCurrentAgent } from "@/lib/auth";
-import { listConversations } from "@/lib/db/queries";
+import { listConversations, listAgents, listAgentsWithLoad } from "@/lib/db/queries";
 import { formatDistanceToNow } from "date-fns";
+import { AgentFilterSelect } from "./agent-filter-select";
 
 const RESOLUTION_STYLE: Record<string, { label: string; className: string; icon: string }> = {
   ai_resolved: { label: "AI resolved", className: "bg-success-soft text-success", icon: "✓" },
@@ -19,16 +20,44 @@ const PRIORITY_STYLE: Record<string, { label: string; className: string; dot: st
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ priority?: string }>;
+  searchParams: Promise<{ priority?: string; agent?: string }>;
 }) {
-  const agent = await getCurrentAgent();
-  const allConversations = await listConversations(agent!.organization_id);
+  const currentAgent = await getCurrentAgent();
+  const isAdmin = currentAgent!.role === "admin";
+  const allConversations = await listConversations(currentAgent!.organization_id);
   const params = await searchParams;
   const priorityFilter = params.priority;
+  const agentFilter = params.agent;
 
-  const conversations = priorityFilter
-    ? allConversations.filter((c) => c.priority === priorityFilter)
-    : allConversations;
+  const agentsList = isAdmin ? await listAgents(currentAgent!.organization_id) : [];
+
+  let isSuggestedForMe = false;
+  if (!isAdmin) {
+    const withLoad = (await listAgentsWithLoad(currentAgent!.organization_id)).sort((a, b) => a.openCases - b.openCases);
+    isSuggestedForMe = withLoad[0]?.id === currentAgent!.id;
+  }
+
+  let conversations = allConversations;
+  if (priorityFilter) {
+    conversations = conversations.filter((c) => c.priority === priorityFilter);
+  }
+  if (agentFilter === "me") {
+    conversations = conversations.filter((c) => {
+      const isMine = c.assigned_agent_id === currentAgent!.id;
+      const isSuggestedUnclaimed =
+        isSuggestedForMe && !c.assigned_agent_id && c.status === "open" && (c.resolution === "escalated" || c.resolution === "pending");
+      return isMine || isSuggestedUnclaimed;
+    });
+  } else if (agentFilter && isAdmin) {
+    conversations = conversations.filter((c) => c.assigned_agent_id === agentFilter);
+  }
+  function buildUrl(priority?: string, agent?: string): string {
+    const p = new URLSearchParams();
+    if (priority) p.set("priority", priority);
+    if (agent) p.set("agent", agent);
+    const q = p.toString();
+    return `/dashboard/conversations${q ? `?${q}` : ""}`;
+  }
 
   return (
     <div className="p-8 max-w-5xl">
@@ -39,10 +68,39 @@ export default async function ConversationsPage({
         Every conversation, tagged by how it was — or needs to be — resolved.
       </p>
 
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <Link
+          href={buildUrl(priorityFilter, undefined)}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+            !agentFilter ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
+          }`}
+        >
+          All cases
+        </Link>
+        {!isAdmin && (
+          <Link
+            href={buildUrl(priorityFilter, "me")}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+              agentFilter === "me" ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
+            }`}
+          >
+            My cases
+          </Link>
+        )} 
+
+        {isAdmin && agentsList.length > 0 && (
+          <AgentFilterSelect
+            agents={agentsList.map((a) => ({ id: a.id, name: a.name }))}
+            currentAgent={agentFilter && agentFilter !== "me" ? agentFilter : undefined}
+            currentPriority={priorityFilter}
+          />
+        )}
+      </div>
+
       <div className="flex gap-2 mb-5">
         <Link
-          href="/dashboard/conversations"
-          className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
+          href={buildUrl(undefined, agentFilter)}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
             !priorityFilter ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
           }`}
         >
@@ -51,8 +109,8 @@ export default async function ConversationsPage({
         {(["high", "medium", "low"] as const).map((p) => (
           <Link
             key={p}
-            href={`/dashboard/conversations?priority=${p}`}
-            className={`text-xs font-medium px-3 py-1.5 rounded-full border flex items-center gap-1.5 transition-colors ${
+            href={buildUrl(p, agentFilter)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${
               priorityFilter === p ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
             }`}
           >
@@ -65,7 +123,7 @@ export default async function ConversationsPage({
       <div className="bg-surface border border-line rounded-lg divide-y divide-line overflow-hidden shadow-sm">
         {conversations.length === 0 && (
           <p className="p-5 text-sm text-ink-muted">
-            No conversations yet — try the{" "}
+            No conversations match this filter — try the{" "}
             <Link href="/widget-demo" className="text-navy underline" target="_blank">
               widget demo
             </Link>
@@ -75,11 +133,14 @@ export default async function ConversationsPage({
         {conversations.map((c) => {
           const style = RESOLUTION_STYLE[c.resolution];
           const pStyle = PRIORITY_STYLE[c.priority] ?? PRIORITY_STYLE.medium;
+          const needsAttention = c.status === "open" && !c.assigned_agent_id && (c.resolution === "escalated" || c.resolution === "pending");
           return (
             <Link
               key={c.id}
               href={`/dashboard/conversations/${c.id}`}
-              className="flex items-center justify-between px-5 py-4 hover:bg-canvas transition-colors group"
+              className={`flex items-center justify-between px-5 py-4 hover:bg-canvas transition-colors group ${
+                needsAttention ? "pill-glow" : ""
+              }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${pStyle.dot}`} />
@@ -97,7 +158,9 @@ export default async function ConversationsPage({
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${pStyle.className}`}>
                   {pStyle.label}
                 </span>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1 ${style.className}`}>
+                <span
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full flex items-center gap-1 ${style.className}`}
+                >
                   <span>{style.icon}</span>
                   {style.label}
                 </span>
@@ -109,3 +172,4 @@ export default async function ConversationsPage({
     </div>
   );
 }
+

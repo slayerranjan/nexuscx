@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentAgent } from "@/lib/auth";
 import { getTeamPerformance } from "@/lib/db/queries";
 import { redirect } from "next/navigation";
+import { AddAgentForm } from "./add-agent-form";
 
 export default async function TeamPage() {
   const agent = await getCurrentAgent();
@@ -12,9 +13,9 @@ export default async function TeamPage() {
   return (
     <div className="p-8 max-w-4xl">
       <h1 className="text-lg font-semibold text-ink mb-1">Team performance</h1>
-      <p className="text-ink-muted text-sm mb-6">
-        Side-by-side summary of every agent&apos;s caseload — click a name for their full detail. Admin only.
-      </p>
+      <p className="text-ink-muted text-sm mb-6">Side-by-side view of every agent&apos;s caseload — admin only.</p>
+
+      <AddAgentForm />
 
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <table className="w-full text-sm">
