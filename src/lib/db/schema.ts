@@ -17,8 +17,10 @@ export async function runMigrations() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      embed_key TEXT
+      embed_key TEXT,
+      enabled_modules TEXT NOT NULL DEFAULT 'website'
     )`,
+
     `CREATE TABLE IF NOT EXISTS agents (
       id TEXT PRIMARY KEY,
       organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -143,6 +145,12 @@ runMigrations().catch((err) => {
 
 try {
     await db.execute(`ALTER TABLE organizations ADD COLUMN embed_key TEXT;`);
+  } catch {
+    // already exists — safe to ignore
+  }
+
+ try {
+    await db.execute(`ALTER TABLE organizations ADD COLUMN enabled_modules TEXT NOT NULL DEFAULT 'website';`);
   } catch {
     // already exists — safe to ignore
   }

@@ -570,3 +570,16 @@ export async function getOrgIdByEmbedKey(embedKey: string): Promise<string | nul
   const row = await dbGet<{ id: string }>(`SELECT id FROM organizations WHERE embed_key = ?`, [embedKey]);
   return row?.id ?? null;
 }
+
+export async function getEnabledModules(organizationId: string): Promise<string[]> {
+  const org = await dbGet<{ enabled_modules: string }>(
+    `SELECT enabled_modules FROM organizations WHERE id = ?`,
+    [organizationId]
+  );
+  return (org?.enabled_modules ?? "website").split(",").map((m) => m.trim());
+}
+
+export async function isModuleEnabled(organizationId: string, module: string): Promise<boolean> {
+  const modules = await getEnabledModules(organizationId);
+  return modules.includes(module);
+}
