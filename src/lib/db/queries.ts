@@ -236,10 +236,14 @@ export async function getOrganization(organizationId: string): Promise<{ id: str
   return dbGet<{ id: string; name: string }>(`SELECT id, name FROM organizations WHERE id = ?`, [organizationId]);
 }
 
-export async function listAgentsWithLoad(organizationId: string): Promise<(AgentRecord & { openCases: number })[]> {
+export async function listAgentsWithLoad(
+  organizationId: string,
+  channel?: string
+): Promise<(AgentRecord & { openCases: number })[]> {
   const agents = await listAgents(organizationId);
   const result = [];
   for (const a of agents) {
+    if (channel && !(await canAgentHandle(a.id, channel))) continue;
     const row = await dbGet<{ c: number }>(
       `SELECT COUNT(*) as c FROM conversations WHERE assigned_agent_id = ? AND status = 'open'`,
       [a.id]
@@ -582,4 +586,23 @@ export async function getEnabledModules(organizationId: string): Promise<string[
 export async function isModuleEnabled(organizationId: string, module: string): Promise<boolean> {
   const modules = await getEnabledModules(organizationId);
   return modules.includes(module);
+} 
+
+
+
+export async function getAgentChannels(agentId: string): Promise<string[]> {
+  const agent = await dbGet<{ channels: string }>(
+    `SELECT channels FROM agents WHERE id = ?`,
+    [agentId]
+  );
+  return (agent?.channels ?? "website,whatsapp,voice").split(",").map((c) => c.trim());
+}
+
+export async function canAgentHandle(agentId: string, channel: string): Promise<boolean> {
+  const channels = await getAgentChannels(agentId);
+  return channels.includes(channel);
+}
+
+export async function updateAgentChannels(agentId: string, channels: string[]): Promise<void> {
+  await dbRun(`UPDATE agents SET channels = ? WHERE id = ?`, [channels.join(","), agentId]);
 }

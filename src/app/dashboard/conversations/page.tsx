@@ -31,10 +31,12 @@ export default async function ConversationsPage({
 
   const agentsList = isAdmin ? await listAgents(currentAgent!.organization_id) : [];
 
-  let isSuggestedForMe = false;
+   let leastBusyByChannel: Record<string, string | undefined> = {};
   if (!isAdmin) {
-    const withLoad = (await listAgentsWithLoad(currentAgent!.organization_id)).sort((a, b) => a.openCases - b.openCases);
-    isSuggestedForMe = withLoad[0]?.id === currentAgent!.id;
+    for (const ch of ["website", "whatsapp", "voice"]) {
+      const withLoad = (await listAgentsWithLoad(currentAgent!.organization_id, ch)).sort((a, b) => a.openCases - b.openCases);
+      leastBusyByChannel[ch] = withLoad[0]?.id;
+    }
   }
 
   let conversations = allConversations;
@@ -44,8 +46,8 @@ export default async function ConversationsPage({
   if (agentFilter === "me") {
     conversations = conversations.filter((c) => {
       const isMine = c.assigned_agent_id === currentAgent!.id;
-      const isSuggestedUnclaimed =
-        isSuggestedForMe && !c.assigned_agent_id && c.status === "open" && (c.resolution === "escalated" || c.resolution === "pending");
+            const isSuggestedUnclaimed =
+        leastBusyByChannel[c.channel] === currentAgent!.id && !c.assigned_agent_id && c.status === "open" && (c.resolution === "escalated" || c.resolution === "pending");
       return isMine || isSuggestedUnclaimed;
     });
   } else if (agentFilter && isAdmin) {
