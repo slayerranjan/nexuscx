@@ -1,0 +1,7 @@
+Item	Estimate
+Agent-level channel tagging (DB + admin UI)	1 day
+Flip UI for blended agents	1 day
+Live call console (genuinely new UI — nothing like this exists yet)	1-2 days
+Real warm transfer to a human agent	1-2 days — but this needs a decision first: how do human agents actually receive a transferred call? Personal phone number, or a browser-based softphone? This is a real operational choice, not just code
+Real Indian phone number + DLT registration	3-7+ days — mostly waiting on the carrier/government process, not build time
+Small polish (disposition codes, recording playback link)

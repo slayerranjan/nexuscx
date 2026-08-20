@@ -21,7 +21,7 @@ export async function runMigrations() {
       enabled_modules TEXT NOT NULL DEFAULT 'website'
     )`,
 
-    `CREATE TABLE IF NOT EXISTS agents (
+       `CREATE TABLE IF NOT EXISTS agents (
       id TEXT PRIMARY KEY,
       organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
@@ -29,6 +29,7 @@ export async function runMigrations() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK (role IN ('admin','agent')),
       is_super_admin INTEGER NOT NULL DEFAULT 0,
+      channels TEXT NOT NULL DEFAULT 'website,whatsapp,voice',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )`,
     `CREATE TABLE IF NOT EXISTS customers (
@@ -151,6 +152,13 @@ try {
 
  try {
     await db.execute(`ALTER TABLE organizations ADD COLUMN enabled_modules TEXT NOT NULL DEFAULT 'website';`);
+  } catch {
+    // already exists — safe to ignore
+  }
+
+  
+try {
+    await db.execute(`ALTER TABLE agents ADD COLUMN channels TEXT NOT NULL DEFAULT 'website,whatsapp,voice';`);
   } catch {
     // already exists — safe to ignore
   }
