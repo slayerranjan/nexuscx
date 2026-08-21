@@ -76,6 +76,22 @@ export function AddAgentForm() {
         </select>
       </div>
 
+      
+      <div className="flex gap-4 text-sm text-ink-muted">
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" name="channels" value="website" defaultChecked />
+          Chat
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" name="channels" value="whatsapp" defaultChecked />
+          WhatsApp
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="checkbox" name="channels" value="voice" defaultChecked />
+          Voice
+        </label>
+      </div>
+
       <button
         type="submit"
         disabled={pending}

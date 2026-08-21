@@ -14,6 +14,7 @@ export async function createAgent(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "").trim();
   const role = String(formData.get("role") ?? "agent");
+    const channels = formData.getAll("channels").map((c) => String(c));
 
   if (!name || !email || !password) {
     return { error: "All fields are required." };
@@ -28,14 +29,30 @@ export async function createAgent(formData: FormData) {
   const passwordHash = await bcrypt.hash(password, 10);
   const agentId = id();
 
-  try {
+    try {
     await db.execute({
-      sql: `INSERT INTO agents (id, organization_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [agentId, currentAgent.organization_id, name, email, passwordHash, role],
+      sql: `INSERT INTO agents (id, organization_id, name, email, password_hash, role, channels) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [agentId, currentAgent.organization_id, name, email, passwordHash, role, channels.join(",") || "website,whatsapp,voice"],
     });
   } catch {
     return { error: "An agent with that email already exists." };
   }
+
+  revalidatePath("/dashboard/team");
+  return { success: true };
+}
+
+
+export async function updateAgentChannelsAction(agentId: string, formData: FormData) {
+  const currentAgent = await getCurrentAgent();
+  if (!currentAgent || currentAgent.role !== "admin") return { error: "Not authorized." };
+
+  const channels = formData.getAll("channels").map((c) => String(c));
+
+  await db.execute({
+    sql: `UPDATE agents SET channels = ? WHERE id = ? AND organization_id = ?`,
+    args: [channels.join(",") || "website,whatsapp,voice", agentId, currentAgent.organization_id],
+  });
 
   revalidatePath("/dashboard/team");
   return { success: true };

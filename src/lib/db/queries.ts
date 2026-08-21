@@ -17,6 +17,7 @@ export interface AgentRecord {
   password_hash: string;
   role: Role;
   is_super_admin: number;
+  channels: string;
 }
 
 export interface KnowledgeArticle {
@@ -454,7 +455,7 @@ export async function getTeamPerformance(organizationId: string) {
   const results = [];
   for (const a of agents) {
     const stats = await getAgentPersonalStats(organizationId, a.id);
-    results.push({ id: a.id, name: a.name, role: a.role, ...stats });
+    results.push({ id: a.id, name: a.name, role: a.role, channels: a.channels, ...stats });
   }
   return results.sort((a, b) => b.resolved - a.resolved);
 }
