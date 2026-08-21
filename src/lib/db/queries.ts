@@ -607,3 +607,14 @@ export async function canAgentHandle(agentId: string, channel: string): Promise<
 export async function updateAgentChannels(agentId: string, channels: string[]): Promise<void> {
   await dbRun(`UPDATE agents SET channels = ? WHERE id = ?`, [channels.join(","), agentId]);
 }
+
+
+export async function setDisposition(
+  conversationId: string,
+  disposition: "resolved" | "escalated" | "dropped" | "follow_up_requested"
+): Promise<void> {
+  await dbRun(`UPDATE conversations SET disposition = ?, updated_at = datetime('now') WHERE id = ?`, [
+    disposition,
+    conversationId,
+  ]);
+}
