@@ -29,6 +29,9 @@ const isSuperAdmin = !!agent.is_super_admin;
           {isSuperAdmin && <NavLink href="/dashboard/organizations">Organizations</NavLink>}
           <NavLink href="/dashboard/customers">Customers</NavLink>
           <NavLink href="/dashboard/knowledge">Knowledge base</NavLink>
+                    {agent.channels.includes("voice") && (
+            <NavLink href="/dashboard/calls">Live call console</NavLink>
+          )}
           <NavLink href="/dashboard/knowledge-gaps">Knowledge gaps</NavLink>
           <NavLink href="/widget-demo" external>
             Widget demo ↗
