@@ -49,6 +49,7 @@ export interface Conversation {
   assigned_agent_id: string | null;
   topic_tag: string | null;
   issue_category: string | null;
+  disposition: string | null;
   sentiment: "positive" | "neutral" | "negative" | null;
   created_at: string;
   updated_at: string;

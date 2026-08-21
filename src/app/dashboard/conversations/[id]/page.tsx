@@ -17,6 +17,7 @@ import { CaseNotes } from "./case-notes";
 import { EditableContact } from "./editable-contact";
 import { ReopenButton } from "./reopen-button";
 import { IssueCategory } from "./issue-category";
+import { DispositionSelect } from "./disposition-select";
 import { LiveMessages } from "./live-messages";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -183,7 +184,11 @@ export default async function ConversationDetailPage({ params }: { params: Promi
                 <span className="text-ink-muted">Channel</span>
                 <span className="text-ink capitalize">{conversation.channel}</span>
               </div>
-              <IssueCategory conversationId={conversation.id} current={conversation.issue_category ?? null} />
+                            <IssueCategory conversationId={conversation.id} current={conversation.issue_category ?? null} />
+            </div>
+
+            <div className="border-t border-line pt-4">
+              <DispositionSelect conversationId={conversation.id} current={conversation.disposition ?? null} />
             </div>
 
             {isAdmin && !isUnassigned && (
