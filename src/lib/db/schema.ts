@@ -67,6 +67,7 @@ export async function runMigrations() {
       resolution TEXT NOT NULL DEFAULT 'pending' CHECK (resolution IN ('pending','ai_resolved','escalated','agent_resolved')),
       priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low','medium','high')),
       issue_category TEXT,
+      disposition TEXT CHECK (disposition IN ('resolved','escalated','dropped','follow_up_requested')),
       agent_typing_until TEXT,
       assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
       topic_tag TEXT,
@@ -159,6 +160,13 @@ try {
   
 try {
     await db.execute(`ALTER TABLE agents ADD COLUMN channels TEXT NOT NULL DEFAULT 'website,whatsapp,voice';`);
+  } catch {
+    // already exists — safe to ignore
+  }
+
+  
+try {
+    await db.execute(`ALTER TABLE conversations ADD COLUMN disposition TEXT;`);
   } catch {
     // already exists — safe to ignore
   }
