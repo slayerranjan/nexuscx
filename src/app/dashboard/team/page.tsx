@@ -16,7 +16,7 @@ export default async function TeamPage() {
       <h1 className="text-lg font-semibold text-ink mb-1">Team performance</h1>
       <p className="text-ink-muted text-sm mb-6">Side-by-side view of every agent&apos;s caseload — admin only.</p>
 
-            <AddAgentForm />``
+                <AddAgentForm />
 
       <div className="bg-surface border border-line rounded-lg overflow-hidden">
         <table className="w-full text-sm">
@@ -42,14 +42,12 @@ export default async function TeamPage() {
                 <td className="px-4 py-3 text-ink">{t.total}</td>
                 <td className="px-4 py-3 text-success font-medium">{t.resolved}</td>
                 <td className="px-4 py-3 text-warning">{t.open}</td>
-                <td className="px-4 py-3 text-ink-muted">
-                  {t.avgResolutionMinutes !== null ? `${t.avgResolutionMinutes}m` : "—"}
-                </td>
-
                                 <td className="px-4 py-3 text-ink-muted">
                   {t.avgResolutionMinutes !== null ? `${t.avgResolutionMinutes}m` : "—"}
                 </td>
-                
+                <td className="px-4 py-3">
+                  <AgentChannelsEditor agentId={t.id} currentChannels={t.channels} />
+                </td>
               </tr>
             ))}
           </tbody>
