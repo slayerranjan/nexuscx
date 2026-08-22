@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createConversation, findOrCreateCustomer, getOrgIdByEmbedKey, isModuleEnabled } from "@/lib/db/queries";
-
+import { db } from "@/lib/db/client";
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.clone().json().catch(() => ({}));
-  console.log("VOICE START RAW BODY:", JSON.stringify(rawBody));
 
   const embedKey = req.headers.get("x-embed-key");
   if (!embedKey) {
@@ -27,6 +26,11 @@ export async function POST(req: NextRequest) {
     organizationId,
     customerId: customer.id,
     channel: "voice",
+  });
+
+  await db.execute({
+    sql: `UPDATE conversations SET debug_payload = ? WHERE id = ?`,
+    args: [JSON.stringify(rawBody), conversation.id],
   });
 
   return NextResponse.json({ conversation_id: conversation.id });
