@@ -27,8 +27,19 @@ export default async function LiveCallConsolePage() {
 
   return (
     <div className="p-8 max-w-4xl">
-      <h1 className="text-lg font-semibold text-ink mb-1">Live call console</h1>
-      <p className="text-ink-muted text-sm mb-6">Recent voice calls handled by AI and your team.</p>
+            <div className="flex items-center justify-between mb-1">
+        <h1 className="text-lg font-semibold text-ink">Live call console</h1>
+        <Link href="/dashboard" className="text-xs text-steel hover:text-navy hover:underline">
+          ← Exit Call Mode
+        </Link>
+      </div>
+      <p className="text-ink-muted text-sm mb-4">Recent voice calls handled by AI and your team.</p>
+      <Link
+        href="/dashboard/conversations?channel=voice"
+        className="inline-block text-xs font-medium bg-gold-soft text-navy-deep px-3 py-1.5 rounded-full mb-6 hover:bg-gold transition-colors"
+      >
+        View full voice queue →
+      </Link>
 
       {voiceConversations.length === 0 ? (
         <div className="bg-surface border border-line rounded-lg p-8 text-center">

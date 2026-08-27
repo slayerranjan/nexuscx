@@ -17,10 +17,16 @@ const PRIORITY_STYLE: Record<string, { label: string; className: string; dot: st
   low: { label: "Low", className: "bg-steel-soft text-navy-deep", dot: "bg-steel" },
 };
 
+const CHANNEL_LABEL: Record<string, string> = {
+  website: "Chat",
+  whatsapp: "WhatsApp",
+  voice: "Voice",
+};
+
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ priority?: string; agent?: string }>;
+  searchParams: Promise<{ priority?: string; agent?: string; channel?: string }>;
 }) {
   const currentAgent = await getCurrentAgent();
   const isAdmin = currentAgent!.role === "admin";
@@ -28,10 +34,11 @@ export default async function ConversationsPage({
   const params = await searchParams;
   const priorityFilter = params.priority;
   const agentFilter = params.agent;
+  const channelFilter = params.channel;
 
   const agentsList = isAdmin ? await listAgents(currentAgent!.organization_id) : [];
 
-   let leastBusyByChannel: Record<string, string | undefined> = {};
+  let leastBusyByChannel: Record<string, string | undefined> = {};
   if (!isAdmin) {
     for (const ch of ["website", "whatsapp", "voice"]) {
       const withLoad = (await listAgentsWithLoad(currentAgent!.organization_id, ch)).sort((a, b) => a.openCases - b.openCases);
@@ -43,20 +50,25 @@ export default async function ConversationsPage({
   if (priorityFilter) {
     conversations = conversations.filter((c) => c.priority === priorityFilter);
   }
+  if (channelFilter) {
+    conversations = conversations.filter((c) => c.channel === channelFilter);
+  }
   if (agentFilter === "me") {
     conversations = conversations.filter((c) => {
       const isMine = c.assigned_agent_id === currentAgent!.id;
-            const isSuggestedUnclaimed =
+      const isSuggestedUnclaimed =
         leastBusyByChannel[c.channel] === currentAgent!.id && !c.assigned_agent_id && c.status === "open" && (c.resolution === "escalated" || c.resolution === "pending");
       return isMine || isSuggestedUnclaimed;
     });
   } else if (agentFilter && isAdmin) {
     conversations = conversations.filter((c) => c.assigned_agent_id === agentFilter);
   }
-  function buildUrl(priority?: string, agent?: string): string {
+
+  function buildUrl(priority?: string, agent?: string, channel?: string): string {
     const p = new URLSearchParams();
     if (priority) p.set("priority", priority);
     if (agent) p.set("agent", agent);
+    if (channel) p.set("channel", channel);
     const q = p.toString();
     return `/dashboard/conversations${q ? `?${q}` : ""}`;
   }
@@ -72,7 +84,7 @@ export default async function ConversationsPage({
 
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <Link
-          href={buildUrl(priorityFilter, undefined)}
+          href={buildUrl(priorityFilter, undefined, channelFilter)}
           className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
             !agentFilter ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
           }`}
@@ -81,14 +93,14 @@ export default async function ConversationsPage({
         </Link>
         {!isAdmin && (
           <Link
-            href={buildUrl(priorityFilter, "me")}
+            href={buildUrl(priorityFilter, "me", channelFilter)}
             className={`text-xs font-medium px-3 py-1.5 rounded-full border transition-colors ${
               agentFilter === "me" ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
             }`}
           >
             My cases
           </Link>
-        )} 
+        )}
 
         {isAdmin && agentsList.length > 0 && (
           <AgentFilterSelect
@@ -99,9 +111,9 @@ export default async function ConversationsPage({
         )}
       </div>
 
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-3">
         <Link
-          href={buildUrl(undefined, agentFilter)}
+          href={buildUrl(undefined, agentFilter, channelFilter)}
           className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
             !priorityFilter ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
           }`}
@@ -111,13 +123,35 @@ export default async function ConversationsPage({
         {(["high", "medium", "low"] as const).map((p) => (
           <Link
             key={p}
-            href={buildUrl(p, agentFilter)}
+            href={buildUrl(p, agentFilter, channelFilter)}
             className={`text-xs font-medium px-3 py-1.5 rounded-full border flex items-center gap-1.5 ${
               priorityFilter === p ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
             }`}
           >
             <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_STYLE[p].dot}`} />
             {PRIORITY_STYLE[p].label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="flex gap-2 mb-5">
+        <Link
+          href={buildUrl(priorityFilter, agentFilter, undefined)}
+          className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
+            !channelFilter ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
+          }`}
+        >
+          All channels
+        </Link>
+        {(["website", "whatsapp", "voice"] as const).map((ch) => (
+          <Link
+            key={ch}
+            href={buildUrl(priorityFilter, agentFilter, ch)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
+              channelFilter === ch ? "bg-navy text-white border-navy" : "border-line text-ink-muted hover:border-steel"
+            }`}
+          >
+            {CHANNEL_LABEL[ch]}
           </Link>
         ))}
       </div>
@@ -174,4 +208,3 @@ export default async function ConversationsPage({
     </div>
   );
 }
-
