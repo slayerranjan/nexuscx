@@ -20,6 +20,18 @@ const isSuperAdmin = !!agent.is_super_admin;
             <img src="/avatar-logo.png" alt="Avatar India" className="h-7 w-auto" />
           </div>
         </div>
+                {agent.channels.includes("voice") &&
+          (agent.channels.includes("website") || agent.channels.includes("whatsapp")) && (
+            <div className="px-2.5 mb-3">
+              <Link
+                href="/dashboard/calls"
+                className="flex items-center gap-2 bg-gold text-navy-deep text-sm font-medium px-3 py-2.5 rounded-md hover:bg-gold-soft transition-colors"
+              >
+                <span>📞</span>
+                <span>Switch to Call Mode</span>
+              </Link>
+            </div>
+          )}
         <nav className="flex-1 px-2.5 space-y-0.5">
           <NavLink href="/dashboard">Overview</NavLink>
           <NavLink href="/dashboard/conversations" badge={unassignedCount}>
