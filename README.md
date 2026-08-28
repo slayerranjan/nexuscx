@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AvatarIndiaCX
 
-## Getting Started
+AI-powered, multi-tenant customer support CRM — chat, WhatsApp, and voice channels
+unified under one system, with an AI resolution engine that answers routine queries
+automatically and escalates complex ones to human agents with full context.
 
-First, run the development server:
+**Live demo:** https://avatarindia-cx.vercel.app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Overview
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+AvatarIndiaCX is a full-stack customer support platform combining:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- An AI chat widget that resolves common queries automatically, using a custom-built
+  knowledge base search engine
+- A full case management system for human agents — claim, reply, close, reopen, reassign
+- Real-time features: live typing indicators, live message sync, live case updates
+- A self-improving knowledge base that detects repeatedly-escalated topics and
+  AI-drafts new articles for human review
+- Multi-tenant architecture supporting multiple isolated client organizations
+- Voice channel integration (via Vapi) — an AI voice agent that handles inbound support
+  calls, searches the same knowledge base mid-call, and logs structured case data
+- Role-based access control, with configurable per-agent channel permissions
+  (chat / WhatsApp / voice)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech Stack
 
-## Learn More
+- **Framework:** Next.js 16 (App Router), TypeScript
+- **Database:** Turso (distributed libSQL/SQLite)
+- **Auth:** NextAuth.js, bcrypt password hashing
+- **AI:** Multi-provider fallback (Claude, Gemini, Groq) for chat resolution; Vapi for voice
+- **Styling:** Tailwind CSS
+- **Deployment:** Vercel
 
-To learn more about Next.js, take a look at the following resources:
+## Key Features
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- AI-first resolution engine with custom lexical search over a knowledge base
+- Full case/CRM record per conversation — contact info, internal notes, issue
+  categorization, linked case history
+- Real-time agent-typing indicator and two-way live message sync
+- Self-improving knowledge base — detects recurring gaps, AI-drafts articles for review
+- Multi-tenant architecture with per-organization data isolation and secured,
+  embeddable widget
+- Voice AI integration — inbound call handling, live knowledge-base lookup mid-call,
+  structured case logging, transcript capture
+- Per-agent, per-channel access control, with case-routing logic that respects each
+  agent's permissions
+- Admin tooling — team performance analytics, agent management, multi-tenant
+  organization management
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Development Note
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project was built through an AI-assisted development process, using Claude
+(Anthropic) as a development collaborator. Architecture decisions, debugging, and
+testing were directed and verified throughout by the developer, with implementation
+code generated and iteratively refined with AI assistance.

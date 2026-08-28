@@ -32,9 +32,16 @@ export default async function ConversationsPage({
   const isAdmin = currentAgent!.role === "admin";
   const allConversations = await listConversations(currentAgent!.organization_id);
   const params = await searchParams;
-  const priorityFilter = params.priority;
+    const priorityFilter = params.priority;
   const agentFilter = params.agent;
-  const channelFilter = params.channel;
+  let channelFilter = params.channel;
+
+  if (!channelFilter && !isAdmin) {
+    const myChannels = currentAgent!.channels.split(",").map((c) => c.trim());
+    if (myChannels.length === 1) {
+      channelFilter = myChannels[0];
+    }
+  }
 
   const agentsList = isAdmin ? await listAgents(currentAgent!.organization_id) : [];
 
