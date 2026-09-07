@@ -17,6 +17,14 @@ const PRIORITY_STYLE: Record<string, { label: string; className: string }> = {
   low: { label: "Low", className: "bg-steel-soft text-navy-deep" },
 };
 
+
+const DISPOSITION_STYLE: Record<string, { label: string; className: string }> = {
+  resolved: { label: "Resolved", className: "bg-success-soft text-success" },
+  escalated: { label: "Escalated", className: "bg-warning-soft text-warning" },
+  dropped: { label: "Call dropped", className: "bg-danger-soft text-danger" },
+  follow_up_requested: { label: "Follow-up requested", className: "bg-steel-soft text-navy-deep" },
+};
+
 export default async function LiveCallConsolePage() {
   const agent = await getCurrentAgent();
   if (!agent) redirect("/login");
@@ -64,9 +72,14 @@ export default async function LiveCallConsolePage() {
                     {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${pStyle.className}`}>{pStyle.label}</span>
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${rStyle.className}`}>{rStyle.label}</span>
+                  {c.disposition && DISPOSITION_STYLE[c.disposition] && (
+                    <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${DISPOSITION_STYLE[c.disposition].className}`}>
+                      {DISPOSITION_STYLE[c.disposition].label}
+                    </span>
+                  )}
                 </div>
               </Link>
             );
