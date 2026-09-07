@@ -185,6 +185,20 @@ export async function closeConversation(conversationId: string): Promise<void> {
   await dbRun(`UPDATE conversations SET status = 'closed', updated_at = datetime('now') WHERE id = ?`, [conversationId]);
 }
 
+
+export async function autoFlagStaleVoiceCases(organizationId: string): Promise<void> {
+  await dbRun(
+    `UPDATE conversations 
+     SET disposition = 'dropped', updated_at = datetime('now') 
+     WHERE organization_id = ? 
+       AND channel = 'voice' 
+       AND status = 'open' 
+       AND disposition IS NULL 
+       AND datetime(created_at) < datetime('now', '-30 minutes')`,
+    [organizationId]
+  );
+}
+
 // ---------- messages ----------
 export async function listMessages(conversationId: string): Promise<Message[]> {
   return dbAll<Message>(`SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC`, [conversationId]);

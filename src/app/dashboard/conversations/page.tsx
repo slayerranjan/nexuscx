@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCurrentAgent } from "@/lib/auth";
-import { listConversations, listAgents, listAgentsWithLoad } from "@/lib/db/queries";
+import { listConversations, listAgents, listAgentsWithLoad, autoFlagStaleVoiceCases } from "@/lib/db/queries";
 import { formatDistanceToNow } from "date-fns";
 import { AgentFilterSelect } from "./agent-filter-select";
 
@@ -28,8 +28,9 @@ export default async function ConversationsPage({
 }: {
   searchParams: Promise<{ priority?: string; agent?: string; channel?: string }>;
 }) {
-  const currentAgent = await getCurrentAgent();
+    const currentAgent = await getCurrentAgent();
   const isAdmin = currentAgent!.role === "admin";
+  await autoFlagStaleVoiceCases(currentAgent!.organization_id);
   const allConversations = await listConversations(currentAgent!.organization_id);
   const params = await searchParams;
     const priorityFilter = params.priority;
