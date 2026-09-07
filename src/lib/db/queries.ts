@@ -189,11 +189,12 @@ export async function closeConversation(conversationId: string): Promise<void> {
 export async function autoFlagStaleVoiceCases(organizationId: string): Promise<void> {
   await dbRun(
     `UPDATE conversations 
-     SET disposition = 'dropped', updated_at = datetime('now') 
+     SET disposition = 'dropped' 
      WHERE organization_id = ? 
        AND channel = 'voice' 
        AND status = 'open' 
        AND disposition IS NULL 
+       AND resolution = 'pending' 
        AND datetime(created_at) < datetime('now', '-30 minutes')`,
     [organizationId]
   );
