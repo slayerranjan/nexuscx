@@ -78,8 +78,11 @@ export default async function ConversationDetailPage({ params }: { params: Promi
     suggestedName = withLoad[0]?.name;
   }
 
-  const allAgentsRaw = isAdmin ? await listAgents(agent!.organization_id) : [];
-  const allAgents = allAgentsRaw.map((a) => ({ id: a.id, name: a.name }));
+   const allAgentsRaw = isAdmin ? await listAgents(agent!.organization_id) : [];
+  const eligibleAgentsRaw = isAdmin
+    ? allAgentsRaw.filter((a) => a.channels.split(",").map((c) => c.trim()).includes(conversation.channel))
+    : [];
+  const allAgents = eligibleAgentsRaw.map((a) => ({ id: a.id, name: a.name }));
 
   const customer = conversation.customer_id ? await getCustomer(conversation.customer_id) : null;
   const previousCases = conversation.customer_id

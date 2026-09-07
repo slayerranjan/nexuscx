@@ -80,6 +80,9 @@ export async function getSuggestion(conversationId: string) {
 export async function reassignCase(conversationId: string, newAgentId: string) {
   const agent = await getCurrentAgent();
   if (!agent || agent.role !== "admin") return;
+  const conversation = await getConversation(conversationId);
+  if (!conversation) return;
+  if (!(await canAgentHandle(newAgentId, conversation.channel))) return;
   await assignAgent(conversationId, newAgentId);
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");
