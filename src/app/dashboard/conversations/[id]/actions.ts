@@ -11,6 +11,7 @@ import {
   addCaseNote,
   updateCustomerContact,
   setAgentTyping,
+  canAgentHandle,
 } from "@/lib/db/queries";
 import { getCurrentAgent } from "@/lib/auth";
 import { suggestAgentReply } from "@/lib/ai/suggestReply";
@@ -38,7 +39,9 @@ export async function sendAgentReply(conversationId: string, content: string) {
 
 export async function claimCase(conversationId: string) {
   const agent = await getCurrentAgent();
-  if (!agent) return;
+  const conversation = await getConversation(conversationId);
+  if (!agent || !conversation) return;
+  if (!(await canAgentHandle(agent.id, conversation.channel))) return;
   await assignAgent(conversationId, agent.id);
   revalidatePath(`/dashboard/conversations/${conversationId}`);
   revalidatePath("/dashboard/conversations");

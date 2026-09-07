@@ -80,7 +80,7 @@ export default async function LiveCallConsolePage() {
                       {DISPOSITION_STYLE[c.disposition].label}
                     </span>
                   )}
-                </div>
+                </div>``
               </Link>
             );
           })}
