@@ -70,12 +70,14 @@ export default async function ConversationDetailPage({ params }: { params: Promi
   const canReply = isAdmin || isMine;
   const isClosed = conversation.status === "closed";
 
-  let suggestedName: string | undefined;
+    let suggestedName: string | undefined;
+  let noEligibleAgents = false;
   if (isUnassigned) {
-    const withLoad = (await listAgentsWithLoad(agent!.organization_id)).sort(
+    const withLoad = (await listAgentsWithLoad(agent!.organization_id, conversation.channel)).sort(
       (a, b) => a.openCases - b.openCases
     );
     suggestedName = withLoad[0]?.name;
+    noEligibleAgents = withLoad.length === 0;
   }
 
    const allAgentsRaw = isAdmin ? await listAgents(agent!.organization_id) : [];
@@ -139,7 +141,13 @@ export default async function ConversationDetailPage({ params }: { params: Promi
               </div>
             ) : (
               <>
-                {showClaim && (
+                                {showClaim && noEligibleAgents && (
+                  <div className="bg-danger-soft border border-danger/30 rounded-lg px-4 py-3 mb-4 text-sm text-danger">
+                    No agent with {conversation.channel} access is currently available to claim this case. 
+                    An admin should review channel assignments in Team Performance.
+                  </div>
+                )}
+                {showClaim && !noEligibleAgents && (
                   <div className="mb-4">
                     <ClaimButton conversationId={conversation.id} suggested={suggestedName} />
                   </div>
