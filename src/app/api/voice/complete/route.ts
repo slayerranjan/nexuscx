@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createConversation,
-  addMessage,
-  findOrCreateCustomer,
-  updateConversationResolution,
-  getOrgIdByEmbedKey,
-  isModuleEnabled,
-} from "@/lib/db/queries";
+import { addMessage, updateConversationResolution, getOrgIdByEmbedKey, isModuleEnabled } from "@/lib/db/queries";
 
 export async function POST(req: NextRequest) {
   const embedKey = req.headers.get("x-embed-key");
@@ -28,39 +21,29 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { issue_summary, urgency, resolved, troubleshooting_attempted, caller_name, caller_contact } = body as {
+  const { conversation_id, issue_summary, urgency, resolved, troubleshooting_attempted } = body as {
+    conversation_id: string;
     issue_summary: string;
     urgency: "high" | "medium" | "low";
     resolved: boolean;
     troubleshooting_attempted?: string;
-    caller_name?: string;
-    caller_contact?: string;
   };
 
-  if (!issue_summary || !urgency || resolved === undefined) {
+  if (!conversation_id || !issue_summary || !urgency || resolved === undefined) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
 
-  const customer = await findOrCreateCustomer({ organizationId, name: caller_name, phone: caller_contact });
-
-  const conversation = await createConversation({
-    organizationId,
-    visitorName: caller_name,
-    customerId: customer.id,
-    channel: "voice",
-  });
-
-  await addMessage({ conversationId: conversation.id, sender: "visitor", content: issue_summary });
+  await addMessage({ conversationId: conversation_id, sender: "visitor", content: issue_summary });
 
   if (troubleshooting_attempted) {
     await addMessage({
-      conversationId: conversation.id,
+      conversationId: conversation_id,
       sender: "ai",
       content: `Troubleshooting attempted during call: ${troubleshooting_attempted}`,
     });
   }
 
-  await updateConversationResolution(conversation.id, resolved ? "ai_resolved" : "escalated", { priority: urgency });
+  await updateConversationResolution(conversation_id, resolved ? "ai_resolved" : "escalated", { priority: urgency });
 
-  return NextResponse.json({ success: true, conversationId: conversation.id });
+  return NextResponse.json({ success: true, conversationId: conversation_id });
 }
