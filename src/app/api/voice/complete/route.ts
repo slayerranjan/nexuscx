@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMessage, updateConversationResolution, getOrgIdByEmbedKey, isModuleEnabled } from "@/lib/db/queries";
-
+import { classifyTopic } from "@/lib/ai/chatEngine";
 export async function POST(req: NextRequest) {
   const embedKey = req.headers.get("x-embed-key");
   if (!embedKey) {
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  await updateConversationResolution(conversation_id, resolved ? "ai_resolved" : "escalated", { priority: urgency });
-
+  const topic = await classifyTopic(issue_summary);
+  await updateConversationResolution(conversation_id, resolved ? "ai_resolved" : "escalated", { priority: urgency, topicTag: topic ?? undefined });
   return NextResponse.json({ success: true, conversationId: conversation_id });
 }

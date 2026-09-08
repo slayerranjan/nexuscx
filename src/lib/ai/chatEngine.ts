@@ -201,6 +201,23 @@ Knowledge base context:
 ${context.length > 0 ? context.map((c, i) => `[${i + 1}] ${c}`).join("\n\n") : "(no relevant articles found)"}`;
 }
 
+export async function classifyTopic(issueSummary: string): Promise<string | null> {
+  const systemPrompt = `Classify the following customer support issue into a short, 2-4 word topic category that a support team would recognize (e.g., "Order tracking", "Billing dispute", "Damaged item"). Respond with ONLY the topic category, nothing else — no punctuation, no explanation.`;
+
+  let text: string | null = null;
+  if (process.env.GROQ_API_KEY) {
+    text = await callGroq(systemPrompt, [], issueSummary);
+  }
+  if (!text && process.env.ANTHROPIC_API_KEY) {
+    text = await callAnthropic(systemPrompt, [], issueSummary);
+  }
+  if (!text && process.env.GEMINI_API_KEY) {
+    text = await callGemini(systemPrompt, [], issueSummary);
+  }
+
+  return text ? text.trim().slice(0, 60) : null;
+}
+
 function templateFallback(context: string[]): ChatResult {
   if (context.length === 0) {
     return {
