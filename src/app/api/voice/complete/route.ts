@@ -42,14 +42,22 @@ export async function POST(req: NextRequest) {
       content: `Troubleshooting attempted during call: ${troubleshooting_attempted}`,
     });
   }
-  const topic = await classifyTopic(issue_summary);
+   const topic = await classifyTopic(issue_summary);
 
   const { db } = await import("@/lib/db/client");
   await db.execute({
     sql: `UPDATE conversations SET debug_payload = ? WHERE id = ?`,
-    args: [JSON.stringify({ issue_summary, topic }), conversation_id],
+    args: [
+      JSON.stringify({
+        issue_summary,
+        topic,
+        hasGroq: !!process.env.GROQ_API_KEY,
+        hasAnthropic: !!process.env.ANTHROPIC_API_KEY,
+        hasGemini: !!process.env.GEMINI_API_KEY,
+      }),
+      conversation_id,
+    ],
   });
-
   await updateConversationResolution(conversation_id, resolved ? "ai_resolved" : "escalated", { priority: urgency, topicTag: topic ?? undefined });
   return NextResponse.json({ success: true, conversationId: conversation_id });
 }
