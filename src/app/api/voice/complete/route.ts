@@ -42,21 +42,32 @@ export async function POST(req: NextRequest) {
       content: `Troubleshooting attempted during call: ${troubleshooting_attempted}`,
     });
   }
-   const topic = await classifyTopic(issue_summary);
+    const topic = await classifyTopic(issue_summary);
+
+  let rawDebug = "not attempted";
+  try {
+    const testResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: "Say hello in one word." }],
+        max_tokens: 20,
+      }),
+    });
+    const testText = await testResponse.text();
+    rawDebug = `Status: ${testResponse.status} | Body: ${testText.slice(0, 300)}`;
+  } catch (err) {
+    rawDebug = `Threw exception: ${err instanceof Error ? err.message : String(err)}`;
+  }
 
   const { db } = await import("@/lib/db/client");
   await db.execute({
     sql: `UPDATE conversations SET debug_payload = ? WHERE id = ?`,
-    args: [
-      JSON.stringify({
-        issue_summary,
-        topic,
-        hasGroq: !!process.env.GROQ_API_KEY,
-        hasAnthropic: !!process.env.ANTHROPIC_API_KEY,
-        hasGemini: !!process.env.GEMINI_API_KEY,
-      }),
-      conversation_id,
-    ],
+    args: [JSON.stringify({ issue_summary, topic, rawDebug }), conversation_id],
   });
   await updateConversationResolution(conversation_id, resolved ? "ai_resolved" : "escalated", { priority: urgency, topicTag: topic ?? undefined });
   return NextResponse.json({ success: true, conversationId: conversation_id });
